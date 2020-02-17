@@ -1,6 +1,6 @@
 ﻿/*
  * This file is part of the Buildings and Habitats object Model (BHoM)
- * Copyright (c) 2015 - 2019, the respective contributors. All rights reserved.
+ * Copyright (c) 2015 - 2020, the respective contributors. All rights reserved.
  *
  * Each contributor holds copyright over their respective contributions.
  * The project versioning (Git) records all such contribution source information.
@@ -36,18 +36,18 @@ namespace BH.Engine.Geometry.Offset
         /***************************************************/
 
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php)")]
-        [Input("curve", "A BHoM Polyline representing the curve to offset")]
+        [Input("polyline", "A BHoM Polyline representing the curve to offset")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards)")]
-        [Output("curve", "A list of BHoM Polylines")]
-        public static List<Polyline> Offset(this Polyline curve, double distance = 0)
+        [Output("polylines", "A list of BHoM Polylines")]
+        public static List<Polyline> Offset(this Polyline polyline, double distance = 0)
         {
-            if (distance == 0) { return new List<Polyline> { curve }; }
+            if (distance == 0) { return new List<Polyline> { polyline }; }
 
             // Transform Polyline to XY plane at Z = 0
             Vector zVector = BH.Engine.Geometry.Create.Vector(0, 0, 1);
-            Plane curvePlane = curve.IFitPlane();
+            Plane curvePlane = polyline.IFitPlane();
             Vector curvePlaneNormal = curvePlane.Normal;
-            List<Point> vertices = curve.IDiscontinuityPoints();
+            List<Point> vertices = polyline.IDiscontinuityPoints();
 
             Point referencePoint = vertices.Min();
             Point xyReferencePoint = BH.Engine.Geometry.Create.Point(referencePoint.X, referencePoint.Y, 0);
@@ -57,7 +57,7 @@ namespace BH.Engine.Geometry.Offset
             double rotationAngle = curvePlaneNormal.Angle(zVector);
             TransformMatrix transformMatrix = BH.Engine.Geometry.Create.RotationMatrix(vertices.Min(), rotationVector, rotationAngle);
 
-            Polyline transformedCurve = curve.Transform(transformMatrix).Translate(translateVector);
+            Polyline transformedCurve = polyline.Transform(transformMatrix).Translate(translateVector);
 
             double scale = 1024.0; // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
 
