@@ -35,13 +35,30 @@ namespace BH.Engine.Geometry.Offset
         /****      public Methods                       ****/
         /***************************************************/
 
-        [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php)")]
+        [PreviousVersion("5.3", "BH.Engine.Geometry.Offset.Compute.Offset(BH.oM.Geometry.Polyline, System.Double)")]
+        [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
         [Input("polyline", "A BHoM Polyline representing the curve to offset")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards)")]
+        [Input("tolerance", "Tolerance to be used for planarity and closedness checks.")]
         [Output("polylines", "A list of BHoM Polylines")]
-        public static List<Polyline> Offset(this Polyline polyline, double distance = 0)
+        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, double tolerance = Tolerance.Distance)
         {
+            if (polyline == null)
+                return null;
+
             if (distance == 0) { return new List<Polyline> { polyline }; }
+
+            if (!polyline.IsClosed(tolerance))
+            {
+                Base.Compute.RecordError("Clipper Offset method only works for closed polylines (polygons).");
+                return null;
+            }
+
+            if (!polyline.IsPlanar(tolerance))
+            {
+                Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
+                return null;
+            }
 
             // Transform Polyline to XY plane at Z = 0
             Vector zVector = BH.Engine.Geometry.Create.Vector(0, 0, 1);
