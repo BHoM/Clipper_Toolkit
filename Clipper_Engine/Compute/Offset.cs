@@ -35,7 +35,6 @@ namespace BH.Engine.Geometry.Offset
         /****      public Methods                       ****/
         /***************************************************/
 
-        [PreviousVersion("5.3", "BH.Engine.Geometry.Offset.Compute.Offset(BH.oM.Geometry.Polyline, System.Double)")]
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
         [Input("polyline", "A BHoM Polyline representing the curve to offset")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards)")]
