@@ -20,12 +20,12 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
-using BH.oM.Geometry;
 using BH.oM.Base.Attributes;
-using System;
+using BH.oM.Geometry;
+using Clipper2Lib;
 using System.Collections.Generic;
-using System.Linq;
 using System.ComponentModel;
+using System.Linq;
 
 namespace BH.Engine.Geometry.Offset
 {
@@ -45,7 +45,8 @@ namespace BH.Engine.Geometry.Offset
             if (polyline == null)
                 return null;
 
-            if (distance == 0) { return new List<Polyline> { polyline }; }
+            if (distance == 0)
+                return new List<Polyline> { polyline };
 
             if (!polyline.IsClosed(tolerance))
             {
@@ -59,53 +60,45 @@ namespace BH.Engine.Geometry.Offset
                 return null;
             }
 
-            // Transform Polyline to XY plane at Z = 0
-            Vector zVector = BH.Engine.Geometry.Create.Vector(0, 0, 1);
+            Point referencePoint = polyline.IDiscontinuityPoints().Min();
+            Point refPointOnXY = BH.Engine.Geometry.Create.Point(referencePoint.X, referencePoint.Y, 0);
+            Vector translateVector = refPointOnXY - referencePoint;
+            TransformMatrix translation = BH.Engine.Geometry.Create.TranslationMatrix(translateVector);
+
+            Vector zVector = Vector.ZAxis;
             Plane curvePlane = polyline.IFitPlane();
-            Vector curvePlaneNormal = curvePlane.Normal;
-            List<Point> vertices = polyline.IDiscontinuityPoints();
+            Vector curveNormal = curvePlane.Normal;
 
-            Point referencePoint = vertices.Min();
-            Point xyReferencePoint = BH.Engine.Geometry.Create.Point(referencePoint.X, referencePoint.Y, 0);
-            Vector translateVector = xyReferencePoint - referencePoint;
+            double rotationAngle = curveNormal.Angle(zVector);
+            Vector rotationVector = curveNormal.CrossProduct(zVector).Normalise();
+            TransformMatrix rotation = BH.Engine.Geometry.Create.RotationMatrix(referencePoint, rotationVector, rotationAngle);
 
-            Vector rotationVector = curvePlaneNormal.CrossProduct(zVector).Normalise();
-            double rotationAngle = curvePlaneNormal.Angle(zVector);
-            TransformMatrix transformMatrix = BH.Engine.Geometry.Create.RotationMatrix(vertices.Min(), rotationVector, rotationAngle);
+            // Transform Polyline to the XY plane at Z = 0
+            TransformMatrix totalTransform = translation * rotation;
+            Polyline transformedCurve = polyline.Transform(totalTransform);
 
-            Polyline transformedCurve = polyline.Transform(transformMatrix).Translate(translateVector);
+            //Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without the last point identical to the first)
+            List<Point> controlPoints = transformedCurve.ControlPoints.Take(transformedCurve.ControlPoints.Count - 1).ToList();
 
-            double scale = 1024.0; // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
+            // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
+            double scale = 1024.0;
 
-            // Convert transformed Polyline into geometry suitable for offsetting using Clipper
-            List<ClipperLib.IntPoint> path = new List<ClipperLib.IntPoint>();
-            foreach (Point pt in transformedCurve.IDiscontinuityPoints())
-            {
-                path.Add(new ClipperLib.IntPoint((long)(pt.X * scale), (long)(pt.Y * scale)));
-            }
-            List<List<ClipperLib.IntPoint>> paths = new List<List<ClipperLib.IntPoint>> { path };
+            Path64 inputPath = new Path64(controlPoints.Select(p => new Point64((long)(p.X * scale), (long)(p.Y * scale))));
 
-            // Offset curve
-            List<List<ClipperLib.IntPoint>> offsetPaths = ClipperLib.Clipper.OffsetPolygons(paths, distance * scale, ClipperLib.JoinType.jtMiter);
+            Paths64 offsetPaths = new Paths64();
+            ClipperOffset offsetter = new ClipperOffset();
+            offsetter.AddPath(inputPath, JoinType.Miter, EndType.Polygon);
+            offsetter.Execute(distance * scale, offsetPaths);
 
-            // Convert offset curve/s back to BHoM geometry
-            List<Polyline> transformedOffsetCurves = new List<Polyline>();
-            foreach (List<ClipperLib.IntPoint> pth in offsetPaths)
-            {
-                List<Point> offsetPts = new List<Point>();
-                foreach (ClipperLib.IntPoint ppt in pth)
-                {
-                    offsetPts.Add(BH.Engine.Geometry.Create.Point(ppt.X / scale, ppt.Y / scale, 0));
-                }
-                offsetPts.Add(BH.Engine.Geometry.Create.Point(pth[0].X / scale, pth[0].Y / scale, 0));
-                transformedOffsetCurves.Add(BH.Engine.Geometry.Create.Polyline(offsetPts));
-            }
-
-            // Convert transformed offset line/s back to original plane
             List<Polyline> offsetCurves = new List<Polyline>();
-            foreach (Polyline transformedOffsetCurve in transformedOffsetCurves)
+            TransformMatrix inverseTransform = totalTransform.Invert();
+
+            // Convert paths to polylines transformed back to the original plane
+            foreach (Path64 path in offsetPaths)
             {
-                offsetCurves.Add(transformedOffsetCurve.Translate(translateVector.Reverse()).Transform(transformMatrix.Invert()));
+                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
+                List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
+                offsetCurves.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
             }
 
             return offsetCurves;
