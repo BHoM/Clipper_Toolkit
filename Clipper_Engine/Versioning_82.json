@@ -1,0 +1,10 @@
+{
+  "Namespace": {
+    "ToNew": {
+      "BH.Engine.Geometry.Offset": "BH.Engine.Geometry.Clipper"
+    },
+    "ToOld": {
+      "BH.Engine.Geometry.Clipper": "BH.Engine.Geometry.Offset"
+    }
+  }
+}
