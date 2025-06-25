@@ -20,32 +20,34 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
-using BH.oM.Geometry;
 using BH.oM.Base.Attributes;
+using BH.oM.Geometry;
+using Clipper2Lib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.ComponentModel;
+using System.Linq;
 
-namespace BH.Engine.Geometry.Offset
+namespace BH.Engine.Geometry.Clipper
 {
     public static partial class Compute
     {
         /***************************************************/
-        /****      public Methods                       ****/
+        /****               Public Methods              ****/
         /***************************************************/
 
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
-        [Input("polyline", "A BHoM Polyline representing the curve to offset")]
-        [Input("distance", "The distance by which to offset the curve (-Ve is inwards)")]
-        [Input("tolerance", "Tolerance to be used for planarity and closedness checks.")]
-        [Output("polylines", "A list of BHoM Polylines")]
+        [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
+        [Input("distance", "The distance by which to offset the curve (-Ve is inwards).")]
+        [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
+        [Output("polylines", "Input polylines after offset.")]
         public static List<Polyline> Offset(this Polyline polyline, double distance = 0, double tolerance = Tolerance.Distance)
         {
             if (polyline == null)
                 return null;
 
-            if (distance == 0) { return new List<Polyline> { polyline }; }
+            if (distance == 0)
+                return new List<Polyline> { polyline };
 
             if (!polyline.IsClosed(tolerance))
             {
@@ -53,67 +55,48 @@ namespace BH.Engine.Geometry.Offset
                 return null;
             }
 
-            if (!polyline.IsPlanar(tolerance))
+            // Fit plane and check if the polyline is planar
+            Plane curvePlane = polyline.FitPlane();
+            if (polyline.ControlPoints.Any((Point x) => Math.Abs(curvePlane.Normal.DotProduct(x - curvePlane.Origin)) > tolerance))
             {
                 Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
                 return null;
             }
 
-            // Transform Polyline to XY plane at Z = 0
-            Vector zVector = BH.Engine.Geometry.Create.Vector(0, 0, 1);
-            Plane curvePlane = polyline.IFitPlane();
-            Vector curvePlaneNormal = curvePlane.Normal;
-            List<Point> vertices = polyline.IDiscontinuityPoints();
+            // Find orientation matrix to the global XY plane
+            TransformMatrix orientation = polyline.OrientationToGlobalXY(curvePlane, tolerance);
+            if (orientation == null)
+                return null;
 
-            Point referencePoint = vertices.Min();
-            Point xyReferencePoint = BH.Engine.Geometry.Create.Point(referencePoint.X, referencePoint.Y, 0);
-            Vector translateVector = xyReferencePoint - referencePoint;
+            // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without the last point identical to the first)
+            List<Point> controlPoints = polyline.ControlPoints.Take(polyline.ControlPoints.Count - 1).Select(x => x.Transform(orientation)).ToList();
 
-            Vector rotationVector = curvePlaneNormal.CrossProduct(zVector).Normalise();
-            double rotationAngle = curvePlaneNormal.Angle(zVector);
-            TransformMatrix transformMatrix = BH.Engine.Geometry.Create.RotationMatrix(vertices.Min(), rotationVector, rotationAngle);
+            // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
+            double scale = 1 / tolerance;
 
-            Polyline transformedCurve = polyline.Transform(transformMatrix).Translate(translateVector);
+            Path64 inputPath = new Path64(controlPoints.Select(p => new Point64((long)(p.X * scale), (long)(p.Y * scale))));
+            inputPath = Clipper2Lib.Clipper.SimplifyPath(inputPath, 1);
 
-            double scale = 1024.0; // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
+            Paths64 offsetPaths = new Paths64();
+            ClipperOffset offsetter = new ClipperOffset();
+            offsetter.AddPath(inputPath, JoinType.Miter, EndType.Polygon);
+            offsetter.Execute(distance * scale, offsetPaths);
+            offsetPaths = Clipper2Lib.Clipper.SimplifyPaths(offsetPaths, 1);
 
-            // Convert transformed Polyline into geometry suitable for offsetting using Clipper
-            List<ClipperLib.IntPoint> path = new List<ClipperLib.IntPoint>();
-            foreach (Point pt in transformedCurve.IDiscontinuityPoints())
-            {
-                path.Add(new ClipperLib.IntPoint((long)(pt.X * scale), (long)(pt.Y * scale)));
-            }
-            List<List<ClipperLib.IntPoint>> paths = new List<List<ClipperLib.IntPoint>> { path };
-
-            // Offset curve
-            List<List<ClipperLib.IntPoint>> offsetPaths = ClipperLib.Clipper.OffsetPolygons(paths, distance * scale, ClipperLib.JoinType.jtMiter);
-
-            // Convert offset curve/s back to BHoM geometry
-            List<Polyline> transformedOffsetCurves = new List<Polyline>();
-            foreach (List<ClipperLib.IntPoint> pth in offsetPaths)
-            {
-                List<Point> offsetPts = new List<Point>();
-                foreach (ClipperLib.IntPoint ppt in pth)
-                {
-                    offsetPts.Add(BH.Engine.Geometry.Create.Point(ppt.X / scale, ppt.Y / scale, 0));
-                }
-                offsetPts.Add(BH.Engine.Geometry.Create.Point(pth[0].X / scale, pth[0].Y / scale, 0));
-                transformedOffsetCurves.Add(BH.Engine.Geometry.Create.Polyline(offsetPts));
-            }
-
-            // Convert transformed offset line/s back to original plane
             List<Polyline> offsetCurves = new List<Polyline>();
-            foreach (Polyline transformedOffsetCurve in transformedOffsetCurves)
+            TransformMatrix inverseTransform = orientation.Invert();
+
+            // Convert paths to polylines transformed back to the original plane
+            foreach (Path64 path in offsetPaths)
             {
-                offsetCurves.Add(transformedOffsetCurve.Translate(translateVector.Reverse()).Transform(transformMatrix.Invert()));
+                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
+                List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
+                offsetCurves.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
             }
 
             return offsetCurves;
         }
+
+        /***************************************************/
     }
 }
-
-
-
-
-
