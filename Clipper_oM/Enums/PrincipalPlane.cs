@@ -20,9 +20,11 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
+using System.ComponentModel;
+
 namespace BH.oM.Clipper
 {
-    //Use this for polyline intersection checks using Clipper instead of BHoM.
+    [Description("Defines the principal planes used for 2D projection operations in Clipper2-based geometry operations. Used for polyline intersection checks and boolean operations using Clipper instead of BHoM's geometry engine.")]
     public enum PrincipalPlane
     {
         Undefined,
