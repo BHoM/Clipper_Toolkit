@@ -22,28 +22,25 @@
 
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
-using BH.oM.Clipper;
+using Clipper2Lib;
 using System;
 using System.ComponentModel;
 
 namespace BH.Engine.Clipper
 {
-    public static partial class Query
+    public static partial class Convert
     {
         /***************************************************/
-        /****              Private methods              ****/
+        /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Get the fixed coordinate value for a point based on the specified principal plane.")]
-        [Input("p", "The point to get the fixed coordinate from.")]
-        [Input("plane", "The principal plane (XY, XZ, or YZ) to determine which coordinate is fixed.")]
-        [Output("fixedCoord", "The fixed coordinate value (Z for XY plane, Y for XZ plane, X for YZ plane).")]
-        public static double FixedCoordinate(this Point p, PrincipalPlane plane)
+        [Description("Convert a BHoM Point to a Clipper2 Point64 with scaling for precision.")]
+        [Input("point", "The BHoM Point to convert.")]
+        [Input("scale", "Scale factor for coordinate precision.")]
+        [Output("point64", "The Clipper2 Point64 representation of the input point.")]
+        public static Point64 ToPoint64(this Point point, double scale)
         {
-            if (plane == PrincipalPlane.XY) return p.Z;
-            if (plane == PrincipalPlane.XZ) return p.Y;
-            if (plane == PrincipalPlane.YZ) return p.X;
-            throw new ArgumentException("Invalid principal plane");
+            return new Point64((long)Math.Round(point.X * scale), (long)Math.Round(point.Y * scale));
         }
 
         /***************************************************/
