@@ -59,4 +59,8 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Clipper_oM\Clipper_oM.csproj" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Convert\" />
+	</ItemGroup>
 </Project>
