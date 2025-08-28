@@ -20,17 +20,28 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
-using System.ComponentModel;
+using BH.Engine.Geometry;
+using BH.oM.Geometry;
 
-namespace BH.oM.Clipper
+namespace BH.Engine.Clipper
 {
-    [Description("Defines the principal planes used for 2D projection operations in Clipper2-based geometry operations. Used for polyline intersection checks and boolean operations using Clipper instead of BHoM's geometry engine.")]
-    public enum PrincipalPlane
+    public static partial class Query
     {
-        Undefined,
-        XY,
-        XZ,
-        YZ
+        /***************************************************/
+        /****              Private methods              ****/
+        /***************************************************/
+
+        public static Polyline OpenPolylineOnXY(this Polyline pLine, TransformMatrix orientation)
+        {
+            Polyline pLineOnXY = pLine.Transform(orientation);
+
+            // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without identical start & end points)
+            if (pLineOnXY.IsClosed())
+                pLineOnXY.ControlPoints.RemoveAt(pLineOnXY.ControlPoints.Count - 1);
+
+            return pLineOnXY;
+        }
+
+        /***************************************************/
     }
 }
-

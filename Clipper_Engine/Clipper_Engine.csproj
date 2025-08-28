@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<AssemblyVersion>8.0.0.0</AssemblyVersion>
-    <Description>https://github.com/BuroHappoldEngineering/Clipper_Toolkit</Description>
+    <Description>https://github.com/BHoM/Clipper_Toolkit</Description>
 		<Version>6.0.0</Version>
 		<Authors>BHoM</Authors>
 		<Copyright>Copyright © https://github.com/BuroHappoldEngineering</Copyright>
@@ -58,9 +58,5 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Clipper_oM\Clipper_oM.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Convert\" />
 	</ItemGroup>
 </Project>

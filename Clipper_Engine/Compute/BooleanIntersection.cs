@@ -63,42 +63,21 @@ namespace BH.Engine.Clipper
                 return null;
 
             // Transform both polylines to the global XY plane.
-            Polyline pLine1OnXY = poly1.Transform(orientation);
-            Polyline pLine2OnXY = poly2.Transform(orientation);
-
-            // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without identical start & end points)
-            if (pLine1OnXY.IsClosed())
-                pLine1OnXY.ControlPoints.RemoveAt(pLine1OnXY.ControlPoints.Count - 1);
-
-            if (pLine2OnXY.IsClosed())
-                pLine2OnXY.ControlPoints.RemoveAt(pLine2OnXY.ControlPoints.Count - 1);
+            Polyline pLine1OnXY = poly1.OpenPolylineOnXY(orientation);
+            Polyline pLine2OnXY = poly2.OpenPolylineOnXY(orientation);
 
             // Scale is set to run the intersection at a much larger scale for precision
             double scale = 1 / tolerance;
-            Path64 subject = new Path64(pLine1OnXY.ControlPoints.Select(p => p.ToPoint64(scale)));
-            Path64 clippers = new Path64(pLine2OnXY.ControlPoints.Select(p => p.ToPoint64(scale)));
 
             Clipper64 clipper = new Clipper64();
-            clipper.AddSubject(subject);
-            clipper.AddClip(clippers);
+            clipper.AddSubject(pLine1OnXY.ToClipPath(scale));
+            clipper.AddClip(pLine2OnXY.ToClipPath(scale));
 
             Paths64 solution = new Paths64();
             clipper.Execute(ClipType.Intersection, FillRule.NonZero, solution);
 
-            if (solution.Count == 0)
-                return null;
-
             // Convert result back to 3D polylines
-            List<Polyline> result = new List<Polyline>();
-            TransformMatrix inverseTransform = orientation.Invert();
-
-            foreach (Path64 path in solution)
-            {
-                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
-                List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
-                result.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
-            }
-
+            List<Polyline> result = solution.ToPolylines(orientation, scale);
             return result;
         }
 
