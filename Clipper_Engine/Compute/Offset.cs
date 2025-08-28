@@ -20,6 +20,8 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
+using BH.Engine.Geometry;
+using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using Clipper2Lib;
@@ -28,7 +30,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 
-namespace BH.Engine.Geometry.Clipper
+namespace BH.Engine.Clipper
 {
     public static partial class Compute
     {
@@ -39,9 +41,10 @@ namespace BH.Engine.Geometry.Clipper
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
         [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards).")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
         [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
         [Output("polylines", "Input polylines after offset.")]
-        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, double tolerance = Tolerance.Distance)
+        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
             if (polyline == null)
                 return null;
@@ -55,12 +58,14 @@ namespace BH.Engine.Geometry.Clipper
                 return null;
             }
 
-            // Fit plane and check if the polyline is planar
-            Plane curvePlane = polyline.FitPlane();
-            if (polyline.ControlPoints.Any((Point x) => Math.Abs(curvePlane.Normal.DotProduct(x - curvePlane.Origin)) > tolerance))
+            if (curvePlane == null)
             {
-                Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
-                return null;
+                curvePlane = polyline.FitPlane();
+                if (polyline.ControlPoints.Any(x => !x.IsInPlane(curvePlane)))
+                {
+                    Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
+                    return null;
+                }
             }
 
             // Find orientation matrix to the global XY plane
@@ -68,33 +73,26 @@ namespace BH.Engine.Geometry.Clipper
             if (orientation == null)
                 return null;
 
-            // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without the last point identical to the first)
-            List<Point> controlPoints = polyline.ControlPoints.Take(polyline.ControlPoints.Count - 1).Select(x => x.Transform(orientation)).ToList();
+            // Transform polyline to XY plane and prepare for Clipper2
+            Polyline polylineOnXY = polyline.OpenPolylineOnXY(orientation);
 
-            // Scale is set to run the offset at a much larger scale, and then rescale back to original coordinates. This smooths the offset curve by making the offset more detailed.
+            // Scale is set to run the offset at a much larger scale for precision
             double scale = 1 / tolerance;
 
-            Path64 inputPath = new Path64(controlPoints.Select(p => new Point64((long)(p.X * scale), (long)(p.Y * scale))));
+            // Convert to Path64 and simplify
+            Path64 inputPath = polylineOnXY.ToClipPath(scale);
             inputPath = Clipper2Lib.Clipper.SimplifyPath(inputPath, 1);
 
+            // Perform offset operation
             Paths64 offsetPaths = new Paths64();
             ClipperOffset offsetter = new ClipperOffset();
             offsetter.AddPath(inputPath, JoinType.Miter, EndType.Polygon);
             offsetter.Execute(distance * scale, offsetPaths);
             offsetPaths = Clipper2Lib.Clipper.SimplifyPaths(offsetPaths, 1);
 
-            List<Polyline> offsetCurves = new List<Polyline>();
-            TransformMatrix inverseTransform = orientation.Invert();
-
-            // Convert paths to polylines transformed back to the original plane
-            foreach (Path64 path in offsetPaths)
-            {
-                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
-                List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
-                offsetCurves.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
-            }
-
-            return offsetCurves;
+            // Convert result back to 3D polylines
+            List<Polyline> result = offsetPaths.ToPolylines(orientation, scale);
+            return result;
         }
 
         /***************************************************/
