@@ -51,7 +51,7 @@ namespace BH.Engine.Clipper
 
             foreach (Path64 path in solution)
             {
-                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
+                List<Point> pointsOnXY = path.Select(x => new Point { X = x.X / scale, Y = x.Y / scale }).ToList();
                 List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
                 result.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
             }

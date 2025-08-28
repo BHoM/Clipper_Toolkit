@@ -55,8 +55,8 @@ namespace BH.Engine.Clipper
             if (curvePlane == null)
             {
                 curvePlane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane))
-                    || clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane))))
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance))
+                    || clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
                 {
                     Base.Compute.RecordError("Clipper BooleanDifference method only works for planar polylines.");
                     return null;

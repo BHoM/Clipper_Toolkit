@@ -52,7 +52,7 @@ namespace BH.Engine.Clipper
             if (curvePlane == null)
             {
                 curvePlane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane)))
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
@@ -60,7 +60,7 @@ namespace BH.Engine.Clipper
             }
 
             // Check if all points are coplanar with the outer polyline
-            if (points.Any(x => !x.IsInPlane(curvePlane)))
+            if (points.Any(x => !x.IsInPlane(curvePlane, tolerance)))
                 return false;
 
             // Find the orientation matrix to the global XY plane

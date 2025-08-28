@@ -37,12 +37,12 @@ namespace BH.Engine.Clipper
         [Input("pLine", "The polyline to transform and open.")]
         [Input("orientation", "The transformation matrix to apply.")]
         [Output("polyline", "The transformed polyline with the last point removed for Clipper2.")]
-        public static Polyline OpenPolylineOnXY(this Polyline pLine, TransformMatrix orientation)
+        public static Polyline OpenPolylineOnXY(this Polyline pLine, TransformMatrix orientation, double tolerance = Tolerance.Distance)
         {
             Polyline pLineOnXY = pLine.Transform(orientation);
 
             // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without identical start & end points)
-            if (pLineOnXY.IsClosed())
+            if (pLineOnXY.IsClosed(tolerance))
                 pLineOnXY.ControlPoints.RemoveAt(pLineOnXY.ControlPoints.Count - 1);
 
             return pLineOnXY;

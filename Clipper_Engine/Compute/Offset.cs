@@ -25,7 +25,6 @@ using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using Clipper2Lib;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -61,7 +60,7 @@ namespace BH.Engine.Clipper
             if (curvePlane == null)
             {
                 curvePlane = polyline.FitPlane();
-                if (polyline.ControlPoints.Any(x => !x.IsInPlane(curvePlane)))
+                if (polyline.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
                     return null;
