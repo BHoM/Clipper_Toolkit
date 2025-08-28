@@ -25,7 +25,6 @@ using BH.oM.Base.Attributes;
 using BH.oM.Clipper;
 using BH.oM.Geometry;
 using Clipper2Lib;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 
@@ -44,7 +43,7 @@ namespace BH.Engine.Clipper
         [Input("acceptOnEdge", "Whether to consider points exactly on the polygon edge as contained. Default is true.")]
         [Input("tolerance", "Tolerance for numerical precision. Default is Tolerance.Distance.")]
         [Output("contains", "True if all points are contained within the outer polyline, false otherwise.")]
-        public static bool PolygonContains(this Polyline outer, List<Point> points, PrincipalPlane plane, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline outer, List<Point> points, PrincipalPlane plane, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
             if (outer == null || points == null || outer.ControlPoints.Count < 3 || points.Count == 0)
                 return false;

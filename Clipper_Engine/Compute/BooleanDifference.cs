@@ -20,10 +20,9 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
-using BH.Engine.Geometry;
 using BH.oM.Base.Attributes;
-using BH.oM.Geometry;
 using BH.oM.Clipper;
+using BH.oM.Geometry;
 using Clipper2Lib;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -41,7 +40,7 @@ namespace BH.Engine.Clipper
         [Input("refRegions", "List of reference polylines to subtract from the main region.")]
         [Input("plane", "The principal plane to project the geometry onto for 2D operations.")]
         [Output("result", "List of polylines representing the difference (main region minus reference regions).")]
-        public static List<Polyline> PolygonDifference(this Polyline region, List<Polyline> refRegions, PrincipalPlane plane)
+        public static List<Polyline> BooleanDifference(this Polyline region, List<Polyline> refRegions, PrincipalPlane plane)
         {
             if (region == null || refRegions == null || region.ControlPoints.Count < 3)
                 return null;
