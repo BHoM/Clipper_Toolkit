@@ -28,7 +28,7 @@ namespace BH.Engine.Clipper
     public static partial class Query
     {
         /***************************************************/
-        /****              Private methods              ****/
+        /****              Public methods               ****/
         /***************************************************/
 
         public static Polyline OpenPolylineOnXY(this Polyline pLine, TransformMatrix orientation)

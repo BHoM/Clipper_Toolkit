@@ -21,12 +21,13 @@
  */
 
 using BH.Engine.Geometry;
+using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
-using BH.oM.Clipper;
 using BH.oM.Geometry;
 using Clipper2Lib;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace BH.Engine.Clipper
 {
@@ -37,34 +38,54 @@ namespace BH.Engine.Clipper
         /***************************************************/
 
         [Description("Check if a polyline contains a list of points using Clipper2 for efficient point-in-polygon testing.")]
-        [Input("outer", "The outer polyline to test against.")]
+        [Input("region", "The outer polyline to test against.")]
         [Input("points", "List of points to check if they are contained within the outer polyline.")]
-        [Input("plane", "The principal plane to project the geometry onto for 2D operations.")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the outer polyline.")]
         [Input("acceptOnEdge", "Whether to consider points exactly on the polygon edge as contained. Default is true.")]
-        [Input("tolerance", "Tolerance for numerical precision. Default is Tolerance.Distance.")]
+        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("contains", "True if all points are contained within the outer polyline, false otherwise.")]
-        public static bool IsContaining(this Polyline outer, List<Point> points, PrincipalPlane plane, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline region, List<Point> points, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
-            if (outer == null || points == null || outer.ControlPoints.Count < 3 || points.Count == 0)
+            if (region == null || points == null || region.ControlPoints.Count < 3 || points.Count == 0)
                 return false;
 
-            if (plane == PrincipalPlane.Undefined)
-                return outer.IsContaining(points);
-
-            double scale = 1.0 / tolerance;
-            Path64 outerPath = outer.ProjectTo2D(plane);
-
-            foreach (Point p in points)
+            if (curvePlane == null)
             {
-                Point p2d = p.ProjectTo2D(plane);
-                Point64 pt = p2d.ToPoint64(scale);
+                curvePlane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane)))
+                {
+                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    return false;
+                }
+            }
 
-                PointInPolygonResult pip = Clipper2Lib.Clipper.PointInPolygon(pt, outerPath);
+            // Check if all points are coplanar with the outer polyline
+            if (points.Any(x => !x.IsInPlane(curvePlane)))
+                return false;
 
-                if (pip == PointInPolygonResult.IsOutside) // Outside
+            // Find the orientation matrix to the global XY plane
+            TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
+            if (orientation == null)
+                return false;
+
+            // Transform outer polyline to the global XY plane
+            Polyline regionOnXY = region.OpenPolylineOnXY(orientation);
+
+            // Scale is set to run the containment test at a much larger scale for precision
+            double scale = 1 / tolerance;
+            Path64 regionPath = regionOnXY.ToClipPath(scale);
+
+            // Transform and test each point
+            foreach (Point pnt in points)
+            {
+                Point64 checkPoint = pnt.Transform(orientation).ToPoint64(scale);
+                PointInPolygonResult checkResult = Clipper2Lib.Clipper.PointInPolygon(checkPoint, regionPath);
+
+                if (checkResult == PointInPolygonResult.IsOutside)
                     return false;
 
-                if (!acceptOnEdge && pip == PointInPolygonResult.IsOn) // On edge, and not accepting edge hits
+                // Check if point is on edge, but we don't accept edge hits
+                if (!acceptOnEdge && checkResult == PointInPolygonResult.IsOn)
                     return false;
             }
 
