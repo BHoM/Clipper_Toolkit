@@ -20,8 +20,10 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
+using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using Clipper2Lib;
+using System.ComponentModel;
 using System.Linq;
 
 namespace BH.Engine.Clipper
@@ -32,6 +34,10 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
+        [Description("Convert a BHoM Polyline to a Clipper2 Path64 with scaling for precision.")]
+        [Input("pLine", "The BHoM Polyline to convert.")]
+        [Input("scale", "Scale factor for coordinate precision. Default is 1e6.")]
+        [Output("path64", "The Clipper2 Path64 representation of the input polyline.")]
         public static Path64 ToClipPath(this Polyline pLine, double scale = 1e6)
         {
             return new Path64(pLine.ControlPoints.Select(p => p.ToPoint64(scale)));

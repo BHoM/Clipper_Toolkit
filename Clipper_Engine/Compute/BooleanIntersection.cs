@@ -40,6 +40,7 @@ namespace BH.Engine.Clipper
         [Description("Perform a boolean intersection operation between two polylines using Clipper2.")]
         [Input("poly1", "The first polyline for intersection.")]
         [Input("poly2", "The second polyline for intersection.")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the first polyline.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the intersection of the two input polylines.")]
         public static List<Polyline> BooleanIntersection(this Polyline poly1, Polyline poly2, Plane curvePlane = null, double tolerance = Tolerance.Distance)

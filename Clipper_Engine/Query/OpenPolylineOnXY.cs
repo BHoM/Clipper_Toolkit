@@ -21,7 +21,9 @@
  */
 
 using BH.Engine.Geometry;
+using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
+using System.ComponentModel;
 
 namespace BH.Engine.Clipper
 {
@@ -31,6 +33,10 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
+        [Description("Transform a polyline to the global XY plane and remove the last point for Clipper2 compatibility.")]
+        [Input("pLine", "The polyline to transform and open.")]
+        [Input("orientation", "The transformation matrix to apply.")]
+        [Output("polyline", "The transformed polyline with the last point removed for Clipper2.")]
         public static Polyline OpenPolylineOnXY(this Polyline pLine, TransformMatrix orientation)
         {
             Polyline pLineOnXY = pLine.Transform(orientation);

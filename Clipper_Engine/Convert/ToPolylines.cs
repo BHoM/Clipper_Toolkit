@@ -21,9 +21,11 @@
  */
 
 using BH.Engine.Geometry;
+using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using Clipper2Lib;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 
 namespace BH.Engine.Clipper
@@ -34,6 +36,11 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
+        [Description("Convert Clipper2 Paths64 back to BHoM Polylines with inverse transformation.")]
+        [Input("solution", "The Clipper2 Paths64 solution to convert.")]
+        [Input("orientation", "The transformation matrix used to orient the geometry.")]
+        [Input("scale", "Scale factor for coordinate precision. Default is 1e6.")]
+        [Output("polylines", "List of BHoM Polylines transformed back to the original coordinate system.")]
         public static List<Polyline> ToPolylines(this Paths64 solution, TransformMatrix orientation, double scale = 1e6)
         {
             if (solution.Count == 0)
