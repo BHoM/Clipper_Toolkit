@@ -20,12 +20,14 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
+using BH.Engine.Geometry;
+using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
-using BH.oM.Clipper;
 using BH.oM.Geometry;
 using Clipper2Lib;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace BH.Engine.Clipper
 {
@@ -38,21 +40,47 @@ namespace BH.Engine.Clipper
         [Description("Perform a boolean intersection operation between two polylines using Clipper2.")]
         [Input("poly1", "The first polyline for intersection.")]
         [Input("poly2", "The second polyline for intersection.")]
-        [Input("plane", "The principal plane to project the geometry onto for 2D operations.")]
+        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the intersection of the two input polylines.")]
-        public static List<Polyline> BooleanIntersection(this Polyline poly1, Polyline poly2, PrincipalPlane plane)
+        public static List<Polyline> BooleanIntersection(this Polyline poly1, Polyline poly2, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
             if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
                 return null;
 
-            double fixedCoord = poly1.ControlPoints[0].FixedCoordinate(plane);
+            if (curvePlane == null)
+            {
+                curvePlane = poly1.FitPlane();
+                if (poly1.ControlPoints.Any(x => !x.IsInPlane(curvePlane)) || poly2.ControlPoints.Any(x => !x.IsInPlane(curvePlane)))
+                {
+                    Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
+                    return null;
+                }
+            }
 
-            Path64 subjPaths = poly1.ProjectTo2D(plane);
-            Path64 clipPaths = poly2.ProjectTo2D(plane);
+            // Find the orientation matrix to the global XY plane
+            TransformMatrix orientation = poly1.OrientationToGlobalXY(curvePlane, tolerance);
+            if (orientation == null)
+                return null;
+
+            // Transform both polylines to the global XY plane.
+            Polyline pLine1OnXY = poly1.Transform(orientation);
+            Polyline pLine2OnXY = poly2.Transform(orientation);
+
+            // Exclude the last point because Clipper2 expects the polygon to be implicitly closed (without identical start & end points)
+            if (pLine1OnXY.IsClosed())
+                pLine1OnXY.ControlPoints.RemoveAt(pLine1OnXY.ControlPoints.Count - 1);
+
+            if (pLine2OnXY.IsClosed())
+                pLine2OnXY.ControlPoints.RemoveAt(pLine2OnXY.ControlPoints.Count - 1);
+
+            // Scale is set to run the intersection at a much larger scale for precision
+            double scale = 1 / tolerance;
+            Path64 subject = new Path64(pLine1OnXY.ControlPoints.Select(p => p.ToPoint64(scale)));
+            Path64 clippers = new Path64(pLine2OnXY.ControlPoints.Select(p => p.ToPoint64(scale)));
 
             Clipper64 clipper = new Clipper64();
-            clipper.AddSubject(subjPaths);
-            clipper.AddClip(clipPaths);
+            clipper.AddSubject(subject);
+            clipper.AddClip(clippers);
 
             Paths64 solution = new Paths64();
             clipper.Execute(ClipType.Intersection, FillRule.NonZero, solution);
@@ -62,9 +90,13 @@ namespace BH.Engine.Clipper
 
             // Convert result back to 3D polylines
             List<Polyline> result = new List<Polyline>();
+            TransformMatrix inverseTransform = orientation.Invert();
+
             foreach (Path64 path in solution)
             {
-                result.Add(path.UnprojectFrom2D(plane, fixedCoord));
+                List<Point> pointsOnXY = path.Select(x => BH.Engine.Geometry.Create.Point(x.X / scale, x.Y / scale)).ToList();
+                List<Point> pointsOnCurvePlane = pointsOnXY.Select(x => x.Transform(inverseTransform)).ToList();
+                result.Add(new Polyline { ControlPoints = pointsOnCurvePlane }.Close());
             }
 
             return result;
@@ -73,3 +105,4 @@ namespace BH.Engine.Clipper
         /***************************************************/
     }
 }
+

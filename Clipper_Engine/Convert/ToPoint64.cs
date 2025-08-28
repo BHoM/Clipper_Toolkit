@@ -38,7 +38,7 @@ namespace BH.Engine.Clipper
         [Input("point", "The BHoM Point to convert.")]
         [Input("scale", "Scale factor for coordinate precision.")]
         [Output("point64", "The Clipper2 Point64 representation of the input point.")]
-        public static Point64 ToPoint64(this Point point, double scale)
+        public static Point64 ToPoint64(this Point point, double scale = 1e6)
         {
             return new Point64((long)Math.Round(point.X * scale), (long)Math.Round(point.Y * scale));
         }
