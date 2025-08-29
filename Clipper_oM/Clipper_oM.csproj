@@ -5,9 +5,9 @@
 		<Version>6.0.0</Version>
 		<Authors>BHoM</Authors>
 		<Copyright>Copyright © https://github.com/BuroHappoldEngineering</Copyright>
-		<RootNamespace>BH.Engine.Clipper</RootNamespace>
+		<RootNamespace>BH.oM.Clipper</RootNamespace>
     <FileVersion>8.3.0.0</FileVersion>
-		<AssemblyName>Clipper_Engine</AssemblyName>
+		<AssemblyName>Clipper_oM</AssemblyName>
 		<TargetFramework>net472</TargetFramework>
 	</PropertyGroup>
 	
@@ -21,31 +21,11 @@
 
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Exec Command="	xcopy &quot;$(TargetDir)$(TargetFileName)&quot;  &quot;C:\ProgramData\BHoM\Assemblies&quot; /Y" />
-		<Exec Command="	xcopy &quot;$(TargetDir)Clipper2Lib.dll&quot;  &quot;C:\ProgramData\BHoM\Assemblies&quot; /Y" />
 	</Target>
 	
 	<ItemGroup>
-		<PackageReference Include="Clipper2" Version="1.4.0" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<Reference Include="BHoM">
 			<HintPath>$(ProgramData)\BHoM\Assemblies\BHoM.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-		</Reference>
-		<Reference Include="BHoM_Engine">
-			<HintPath>$(ProgramData)\BHoM\Assemblies\BHoM_Engine.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-		</Reference>
-		<Reference Include="Dimensional_oM">
-			<HintPath>$(ProgramData)\BHoM\Assemblies\Dimensional_oM.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
-      <Private>False</Private>
-		</Reference>
-		<Reference Include="Geometry_Engine">
-			<HintPath>$(ProgramData)\BHoM\Assemblies\Geometry_Engine.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
 		</Reference>
@@ -55,8 +35,5 @@
       <Private>False</Private>
 		</Reference>
 	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\Clipper_oM\Clipper_oM.csproj" />
-	</ItemGroup>
 </Project>
+
