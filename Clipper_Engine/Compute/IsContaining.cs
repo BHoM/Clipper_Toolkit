@@ -93,5 +93,56 @@ namespace BH.Engine.Clipper
         }
 
         /***************************************************/
+
+        [Description("Returns true if the reference polyline is fully contained within the region polyline. " +
+            "Both polylines must be planar and coplanar. Optionally specify the plane and tolerance.")]
+        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        {
+            if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
+                return false;
+
+            if (curvePlane == null)
+            {
+                curvePlane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance))
+                    || refRegion.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                {
+                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    return false;
+                }
+            }
+
+            // Find the orientation matrix to the global XY plane
+            TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
+            if (orientation == null)
+                return false;
+
+            // Transform both polylines to the global XY plane
+            Polyline regionOnXY = region.OpenPolylineOnXY(orientation);
+            Polyline refRegionOnXY = refRegion.OpenPolylineOnXY(orientation);
+
+            // Scale is set to run the containment test at a much larger scale for precision
+            double scale = 1 / tolerance;
+            Path64 regionPath = regionOnXY.ToClipPath(scale);
+            Path64 refRegionPath = refRegionOnXY.ToClipPath(scale);
+
+            // Check if all points of refRegion are inside region
+            foreach (Point pnt in refRegionOnXY.ControlPoints)
+            {
+                Point64 checkPoint = pnt.ToPoint64(scale);
+                PointInPolygonResult checkResult = Clipper2Lib.Clipper.PointInPolygon(checkPoint, regionPath);
+
+                if (checkResult == PointInPolygonResult.IsOutside)
+                    return false;
+
+                // Check if point is on edge, but we don't accept edge hits
+                if (!acceptOnEdge && checkResult == PointInPolygonResult.IsOn)
+                    return false;
+            }
+
+            return true;
+        }
+
+        /***************************************************/
     }
 }
