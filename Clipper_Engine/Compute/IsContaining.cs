@@ -96,6 +96,12 @@ namespace BH.Engine.Clipper
 
         [Description("Returns true if the reference polyline is fully contained within the region polyline. " +
             "Both polylines must be planar and coplanar. Optionally specify the plane and tolerance.")]
+        [Input("region", "The outer polyline region to test for containment.")]
+        [Input("refRegion", "The reference polyline to check if it is fully contained within the region.")]
+        [Input("curvePlane", "Optional. The plane on which both polylines lie. If null, the plane is computed from the region polyline.")]
+        [Input("acceptOnEdge", "Optional. If true, points on the edge are considered contained. Default is true.")]
+        [Input("tolerance", "Optional. The geometric tolerance for coplanarity and containment checks. Default is Tolerance.Distance.")]
+        [Output("True if the reference polyline is fully contained within the region polyline; otherwise, false.")]
         public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
             if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
