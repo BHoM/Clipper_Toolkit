@@ -150,5 +150,19 @@ namespace BH.Engine.Clipper
         }
 
         /***************************************************/
+
+        [Description("Check if a polyline contains a list of reference polylines using Clipper2 for efficient polygon-in-polygon testing.")]
+        [Input("region", "The outer polyline to test against.")]
+        [Input("refRegions", "List of polylines to check if they are contained within the outer polyline.")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the outer polyline.")]
+        [Input("acceptOnEdge", "Whether to consider points exactly on the polygon edge as contained. Default is true.")]
+        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
+        [Output("contains", "True if all reference polylines are fully contained within the region polyline, false otherwise.")]
+        public static bool IsContaining(this Polyline region, List<Polyline> refRegions, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        {
+            return refRegions.All(x => region.IsContaining(x, curvePlane, acceptOnEdge, tolerance));
+        }
+
+        /***************************************************/
     }
 }
