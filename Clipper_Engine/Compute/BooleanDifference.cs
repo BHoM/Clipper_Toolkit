@@ -55,12 +55,17 @@ namespace BH.Engine.Clipper
             if (curvePlane == null)
             {
                 curvePlane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance))
-                    || clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
                 {
-                    Base.Compute.RecordError("Clipper BooleanDifference method only works for planar polylines.");
+                    Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
                     return null;
                 }
+            }
+
+            if (clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
+            {
+                Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
+                return null;
             }
 
             // Find the orientation matrix to the global XY plane

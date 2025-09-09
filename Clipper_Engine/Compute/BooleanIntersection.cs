@@ -51,11 +51,17 @@ namespace BH.Engine.Clipper
             if (curvePlane == null)
             {
                 curvePlane = poly1.FitPlane();
-                if (poly1.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)) || poly2.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                if (poly1.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
                     return null;
                 }
+            }
+
+            if (poly2.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+            {
+                Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
+                return null;
             }
 
             // Find the orientation matrix to the global XY plane

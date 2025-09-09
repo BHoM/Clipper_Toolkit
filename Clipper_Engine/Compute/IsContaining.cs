@@ -99,54 +99,11 @@ namespace BH.Engine.Clipper
         [Input("region", "The outer polyline region to test for containment.")]
         [Input("refRegion", "The reference polyline to check if it is fully contained within the region.")]
         [Input("curvePlane", "Optional. The plane on which both polylines lie. If null, the plane is computed from the region polyline.")]
-        [Input("acceptOnEdge", "Optional. If true, points on the edge are considered contained. Default is true.")]
         [Input("tolerance", "Optional. The geometric tolerance for coplanarity and containment checks. Default is Tolerance.Distance.")]
         [Output("True if the reference polyline is fully contained within the region polyline; otherwise, false.")]
-        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
-            if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
-                return false;
-
-            if (curvePlane == null)
-            {
-                curvePlane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance))
-                    || refRegion.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
-                {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
-                    return false;
-                }
-            }
-
-            // Find the orientation matrix to the global XY plane
-            TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
-            if (orientation == null)
-                return false;
-
-            // Transform both polylines to the global XY plane
-            Polyline regionOnXY = region.OpenPolylineOnXY(orientation);
-            Polyline refRegionOnXY = refRegion.OpenPolylineOnXY(orientation);
-
-            // Scale is set to run the containment test at a much larger scale for precision
-            double scale = 1 / tolerance;
-            Path64 regionPath = regionOnXY.ToClipPath(scale);
-            Path64 refRegionPath = refRegionOnXY.ToClipPath(scale);
-
-            // Check if all points of refRegion are inside region
-            foreach (Point pnt in refRegionOnXY.ControlPoints)
-            {
-                Point64 checkPoint = pnt.ToPoint64(scale);
-                PointInPolygonResult checkResult = Clipper2Lib.Clipper.PointInPolygon(checkPoint, regionPath);
-
-                if (checkResult == PointInPolygonResult.IsOutside)
-                    return false;
-
-                // Check if point is on edge, but we don't accept edge hits
-                if (!acceptOnEdge && checkResult == PointInPolygonResult.IsOn)
-                    return false;
-            }
-
-            return true;
+            return refRegion.BooleanDifference(new List<Polyline> { region }, curvePlane, tolerance)?.Count == 0;
         }
 
         /***************************************************/
@@ -155,12 +112,11 @@ namespace BH.Engine.Clipper
         [Input("region", "The outer polyline to test against.")]
         [Input("refRegions", "List of polylines to check if they are contained within the outer polyline.")]
         [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the outer polyline.")]
-        [Input("acceptOnEdge", "Whether to consider points exactly on the polygon edge as contained. Default is true.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("contains", "True if all reference polylines are fully contained within the region polyline, false otherwise.")]
-        public static bool IsContaining(this Polyline region, List<Polyline> refRegions, Plane curvePlane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline region, List<Polyline> refRegions, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
-            return refRegions.All(x => region.IsContaining(x, curvePlane, acceptOnEdge, tolerance));
+            return refRegions.All(x => region.IsContaining(x, curvePlane, tolerance));
         }
 
         /***************************************************/
