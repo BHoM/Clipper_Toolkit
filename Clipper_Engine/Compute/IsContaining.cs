@@ -103,6 +103,31 @@ namespace BH.Engine.Clipper
         [Output("True if the reference polyline is fully contained within the region polyline; otherwise, false.")]
         public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
+            if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
+                return false;
+
+            if (curvePlane == null)
+            {
+                curvePlane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                {
+                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    return false;
+                }
+            }
+
+            if (refRegion.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+            {
+                Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                return false;
+            }
+
+            if (region.IsContaining(refRegion.ControlPoints, curvePlane, true, tolerance) == false)
+            {
+                return false;
+            }
+
+            //If refRegion sits fully inside the outer region, the boolean difference result should be empty
             return refRegion.BooleanDifference(new List<Polyline> { region }, curvePlane, tolerance)?.Count == 0;
         }
 
