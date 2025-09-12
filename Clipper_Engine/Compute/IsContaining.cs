@@ -93,5 +93,67 @@ namespace BH.Engine.Clipper
         }
 
         /***************************************************/
+
+        [Description("Returns true if the reference polyline is fully contained within the region polyline. " +
+            "Both polylines must be planar and coplanar. Optionally specify the plane and tolerance.")]
+        [Input("region", "The outer polyline region to test for containment.")]
+        [Input("refRegion", "The reference polyline to check if it is fully contained within the region.")]
+        [Input("curvePlane", "Optional. The plane on which both polylines lie. If null, the plane is computed from the region polyline.")]
+        [Input("tolerance", "Optional. The geometric tolerance for coplanarity and containment checks. Default is Tolerance.Distance.")]
+        [Output("True if the reference polyline is fully contained within the region polyline; otherwise, false.")]
+        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        {
+            if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
+                return false;
+
+            if (curvePlane == null)
+            {
+                curvePlane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                {
+                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    return false;
+                }
+            }
+
+            if (refRegion.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+            {
+                Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                return false;
+            }
+
+            if (region.IsContaining(refRegion.ControlPoints, curvePlane, true, tolerance) == false)
+            {
+                return false;
+            }
+
+            //If refRegion sits fully inside the outer region, the boolean difference result should be empty
+            return refRegion.BooleanDifference(new List<Polyline> { region }, curvePlane, tolerance)?.Count == 0;
+        }
+
+        /***************************************************/
+
+        [Description("Check if a polyline contains a list of reference polylines using Clipper2 for efficient polygon-in-polygon testing.")]
+        [Input("region", "The outer polyline to test against.")]
+        [Input("refRegions", "List of polylines to check if they are contained within the outer polyline.")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the outer polyline.")]
+        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
+        [Output("contains", "True if all reference polylines are fully contained within the region polyline, false otherwise.")]
+        public static bool IsContaining(this Polyline region, List<Polyline> refRegions, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        {
+            if (curvePlane == null)
+            {
+                curvePlane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                {
+                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    return false;
+                }
+            }
+
+            return refRegions.All(x => region.IsContaining(x, curvePlane, tolerance));
+        }
+
+        /***************************************************/
     }
 }
