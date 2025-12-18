@@ -43,7 +43,6 @@ namespace BH.Engine.Clipper
         [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
         [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
         [Output("polylines", "Input polylines after offset.")]
-        [PreviousVersion("8.3", "BH.Engine.Geometry.Clipper.Compute.Offset(BH.oM.Geometry.Polyline, System.Double, System.Double)")]
         public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane curvePlane = null, double tolerance = Tolerance.Distance)
         {
             if (polyline == null)

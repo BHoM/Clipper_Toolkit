@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<AssemblyVersion>8.0.0.0</AssemblyVersion>
+		<AssemblyVersion>9.0.0.0</AssemblyVersion>
     <Description>https://github.com/BHoM/Clipper_Toolkit</Description>
 		<Version>6.0.0</Version>
 		<Authors>BHoM</Authors>
 		<Copyright>Copyright © https://github.com/BuroHappoldEngineering</Copyright>
 		<RootNamespace>BH.oM.Clipper</RootNamespace>
-    <FileVersion>8.3.0.0</FileVersion>
+    <FileVersion>9.0.0.0</FileVersion>
 		<AssemblyName>Clipper_oM</AssemblyName>
 		<TargetFramework>net472</TargetFramework>
 	</PropertyGroup>
@@ -14,6 +14,7 @@
 	<PropertyGroup>
 		<OutputPath>..\Build\</OutputPath>
 		<Configurations>Debug;Release</Configurations>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
 		<AppendTargetFrameworkToOutputpath>false</AppendTargetFrameworkToOutputpath>
 		<ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
