@@ -6,7 +6,7 @@
 		<Authors>BHoM</Authors>
 		<Copyright>Copyright © https://github.com/BuroHappoldEngineering</Copyright>
 		<RootNamespace>BH.oM.Clipper</RootNamespace>
-    <FileVersion>9.1.0.0</FileVersion>
+    <FileVersion>9.2.0.0</FileVersion>
 		<AssemblyName>Clipper_oM</AssemblyName>
 		<TargetFramework>net472</TargetFramework>
 	</PropertyGroup>
