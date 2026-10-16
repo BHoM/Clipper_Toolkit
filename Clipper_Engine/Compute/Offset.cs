@@ -95,6 +95,42 @@ namespace BH.Engine.Clipper
         }
 
         /***************************************************/
+
+        [Description("Offset a closed planar polyline inward or outward, returning the largest valid result. Flips offset direction when the result unexpectedly grows or shrinks.")]
+        [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
+        [Input("distance", "The offset distance (positive magnitude).")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
+        [Input("inward", "If true, offsets inward; otherwise outward.")]
+        [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
+        [Output("polyline", "The offset polyline with the largest area, or null if invalid.")]
+        public static Polyline Offset(this Polyline polyline, double distance, Plane curvePlane = null, bool inward = false, double tolerance = Tolerance.Distance)
+        {
+            if (polyline == null || distance == 0)
+                return polyline;
+
+            if (curvePlane == null)
+                curvePlane = polyline.FitPlane();
+
+            double signedDistance = inward ? -distance : distance;
+            Polyline offset = Offset(polyline, signedDistance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
+            if (offset == null || offset.ControlPoints.Count == 0)
+                return null;
+
+            double originalDiagonal = polyline.Bounds().DiagonalLength();
+            double offsetDiagonal = offset.Bounds().DiagonalLength();
+
+            if (inward && offsetDiagonal > originalDiagonal)
+                offset = Offset(polyline, distance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
+            else if (!inward && offsetDiagonal < originalDiagonal)
+                offset = Offset(polyline, -distance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
+
+            if (offset != null && offset.ControlPoints.Any())
+                return offset;
+
+            return null;
+        }
+
+        /***************************************************/
     }
 }
 

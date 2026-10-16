@@ -101,6 +101,33 @@ namespace BH.Engine.Clipper
         }
 
         /***************************************************/
+
+        [Description("Perform a boolean difference between each subject polyline and a list of clip polylines using Clipper2.")]
+        [Input("subjects", "Closed polyline regions to subtract from.")]
+        [Input("clips", "Closed polyline regions to subtract.")]
+        [Input("curvePlane", "Optional plane for the geometry. If null, each subject fits its own plane.")]
+        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
+        [Output("result", "Polylines representing each subject minus the clip regions.")]
+        public static List<Polyline> BooleanDifference(this List<Polyline> subjects, List<Polyline> clips, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        {
+            if (subjects == null || !subjects.Any())
+                return subjects ?? new List<Polyline>();
+
+            if (clips == null || !clips.Any())
+                return subjects;
+
+            List<Polyline> result = new List<Polyline>();
+            foreach (Polyline subject in subjects)
+            {
+                List<Polyline> difference = subject.BooleanDifference(clips, curvePlane, tolerance);
+                if (difference != null)
+                    result.AddRange(difference);
+            }
+
+            return result;
+        }
+
+        /***************************************************/
     }
 }
 
