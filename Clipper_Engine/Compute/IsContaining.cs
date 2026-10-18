@@ -176,6 +176,10 @@ namespace BH.Engine.Clipper
                 if (point == null)
                     return false;
 
+                // A point farther than tolerance from the face is outside. Projection is only for the 2D test.
+                if (!point.IsInPlane(curvePlane, tolerance))
+                    return false;
+
                 Point ptOnXY = point.Project(curvePlane).Transform(orientation);
                 PointInPolygonResult result = Clipper2Lib.Clipper.PointInPolygon(ptOnXY.ToPoint64(scale), path);
                 if (result == PointInPolygonResult.IsOutside)

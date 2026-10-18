@@ -37,9 +37,9 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Perform a boolean difference operation between a main region and a list of reference regions using Clipper2.")]
+        [Description("Perform a boolean difference operation between a main region and a list of reference regions using Clipper2. Reference regions that do not lie on the subject plane are skipped, and the subject is kept.")]
         [Input("region", "The main polyline region to subtract from.")]
-        [Input("refRegions", "List of reference polylines to subtract from the main region.")]
+        [Input("refRegions", "List of reference polylines to subtract from the main region. Regions off the subject plane are ignored.")]
         [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the main region.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the difference (main region minus reference regions).")]
@@ -62,11 +62,10 @@ namespace BH.Engine.Clipper
                 }
             }
 
-            if (clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
-            {
-                Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
-                return null;
-            }
+            // An opening on another plane must not discard the subject. Subtract only the clips that lie on this plane.
+            clipRegions = clipRegions.Where(x => x.ControlPoints.All(y => y != null && y.IsInPlane(curvePlane, tolerance))).ToList();
+            if (clipRegions.Count == 0)
+                return new List<Polyline> { region };
 
             // Find the orientation matrix to the global XY plane
             TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
