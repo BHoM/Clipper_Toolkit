@@ -60,12 +60,12 @@ namespace BH.Engine.Clipper
                     Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
                     return null;
                 }
-            }
 
-            // An opening on another plane must not discard the subject. Subtract only the clips that lie on this plane.
-            clipRegions = clipRegions.Where(x => x.ControlPoints.All(y => y != null && y.IsInPlane(curvePlane, tolerance))).ToList();
-            if (clipRegions.Count == 0)
-                return new List<Polyline> { region };
+                // An opening on another plane must not discard the subject. Subtract only the clips that lie on this plane.
+                clipRegions = clipRegions.Where(x => x.ControlPoints.All(y => y != null && y.IsInPlane(curvePlane, tolerance))).ToList();
+                if (clipRegions.Count == 0)
+                    return new List<Polyline> { region };
+            }
 
             // Find the orientation matrix to the global XY plane
             TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
@@ -96,33 +96,6 @@ namespace BH.Engine.Clipper
 
             // Convert result back to 3D polylines
             List<Polyline> result = solution.ToPolylines(orientation, scale);
-            return result;
-        }
-
-        /***************************************************/
-
-        [Description("Perform a boolean difference between each subject polyline and a list of clip polylines using Clipper2.")]
-        [Input("subjects", "Closed polyline regions to subtract from.")]
-        [Input("clips", "Closed polyline regions to subtract.")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, each subject fits its own plane.")]
-        [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
-        [Output("result", "Polylines representing each subject minus the clip regions.")]
-        public static List<Polyline> BooleanDifference(this List<Polyline> subjects, List<Polyline> clips, Plane curvePlane = null, double tolerance = Tolerance.Distance)
-        {
-            if (subjects == null || !subjects.Any())
-                return subjects ?? new List<Polyline>();
-
-            if (clips == null || !clips.Any())
-                return subjects;
-
-            List<Polyline> result = new List<Polyline>();
-            foreach (Polyline subject in subjects)
-            {
-                List<Polyline> difference = subject.BooleanDifference(clips, curvePlane, tolerance);
-                if (difference != null)
-                    result.AddRange(difference);
-            }
-
             return result;
         }
 
