@@ -44,25 +44,17 @@ namespace BH.Engine.Clipper
             if (polylines == null)
                 return new List<Polyline>();
 
-            List<Polyline> input = polylines.ToList();
-            if (input.Count < 2)
-                return input;
-
             List<Polyline> uniquePolylines = new List<Polyline>();
-
-            foreach (Polyline pLine in input)
+            foreach (Polyline polyline in polylines)
             {
-                if (checkSelfIntersection && pLine.IsSelfIntersectingPolygon(clipPlane))
+                if (polyline == null)
                     continue;
 
-                if (uniquePolylines.Any(x => x.PolygonOverlaps(pLine, clipPlane)) == false)
-                    uniquePolylines.Add(pLine);
+                if (!uniquePolylines.Any(x => x.IsSame(polyline)))
+                    uniquePolylines.Add(polyline);
             }
 
-            if (uniquePolylines.Any())
-                return uniquePolylines;
-
-            return input;
+            return uniquePolylines;
         }
 
         /***************************************************/

@@ -105,6 +105,8 @@ namespace BH.Engine.Clipper
         [Output("polyline", "The offset polyline with the largest area, or null if invalid.")]
         public static Polyline Offset(this Polyline polyline, double distance, Plane curvePlane = null, bool inward = false, double tolerance = Tolerance.Distance)
         {
+            //TODO: this is a wrapper, not foundational method, move it to the client
+
             if (polyline == null || distance == 0)
                 return polyline;
 

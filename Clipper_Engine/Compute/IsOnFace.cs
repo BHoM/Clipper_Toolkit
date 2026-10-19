@@ -45,46 +45,49 @@ namespace BH.Engine.Clipper
             if (point == null || surface?.ExternalBoundary == null)
                 return false;
 
-            Plane plane = surface.FitPlane(tolerance);
-            if (!ContainsOnBoundary(surface.ExternalBoundary, point, plane, true, tolerance))
-                return false;
-
-            if (surface.InternalBoundaries == null)
-                return true;
-
-            return !surface.InternalBoundaries.Any(x => x != null && ContainsOnBoundary(x, point, plane, false, tolerance));
-        }
-
-        /***************************************************/
-
-        [Description("Checks if a point lies on any of the input planar surfaces.")]
-        [Input("point", "Point to test.")]
-        [Input("surfaces", "Planar surfaces to test against.")]
-        [Input("tolerance", "Distance tolerance for the containment check.")]
-        [Output("isOnFace", "True if the point lies on at least one surface.")]
-        public static bool IsOnFace(this Point point, IEnumerable<PlanarSurface> surfaces, double tolerance = Tolerance.Distance)
-        {
-            if (point == null || surfaces == null)
-                return false;
-
-            return surfaces.Any(x => point.IsOnFace(x, tolerance));
-        }
-
-        /***************************************************/
-        /****              Private methods              ****/
-        /***************************************************/
-
-        private static bool ContainsOnBoundary(ICurve boundary, Point point, Plane plane, bool acceptOnEdge, double tolerance)
-        {
-            if (boundary is Polyline polyline)
+            //TODO: check if all outlines are polyline
+            Polyline outer = surface.ExternalBoundary as Polyline;
+            if (outer == null)
             {
-                if (plane == null)
-                    return false;
-
-                return polyline.IsContaining(point, plane, acceptOnEdge, tolerance);
+                BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
+                return false;
             }
 
-            return boundary.IIsContaining(new List<Point> { point }, acceptOnEdge, tolerance);
+            List<Polyline> inner = surface.InternalBoundaries?.Select(x => x as Polyline).Where(x => x != null).ToList() ?? new List<Polyline>();
+            if (inner.Count != surface.InternalBoundaries?.Count)
+            {
+                BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
+                return false;
+            }
+
+            Plane plane = surface.FitPlane(tolerance);
+            return point.IsOnFace(outer, inner, plane, tolerance);
+
+        }
+
+        /***************************************************/
+
+        //[Description("Checks if a point is inside the boundary of a planar surface but not inside one of its holes.")]
+        //[Input("point", "A point that is potentially inside the boundary of a planar surface.")]
+        //[Input("surface", "A planar surface that can have internal boundaries/holes.")]
+        //[Input("tolerance", "Distance tolerance for the containment check.")]
+        //[Output("isOnFace", "True if the point is inside the outer boundary and not inside a hole.")]
+        public static bool IsOnFace(this Point point, Polyline outer, List<Polyline> inner, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        {
+            if (curvePlane == null)
+            {
+                curvePlane = outer?.FitPlane(tolerance);
+                if (outer != null && (outer.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)) || inner.Any(y => y.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))))
+                {
+                    Base.Compute.RecordError("Clipper IsOnFace method only works for coplanar polylines.");
+                    return false;
+                }
+
+                if (!point.IsInPlane(curvePlane, tolerance) == false)
+                    return false;
+            }
+
+            return outer.IsContaining(point, curvePlane, true, tolerance) && !inner.Any(x => x != null && x.IsContaining(point, curvePlane, false, tolerance));
         }
 
         /***************************************************/

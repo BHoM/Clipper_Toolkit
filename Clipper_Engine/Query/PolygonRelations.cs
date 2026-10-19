@@ -41,12 +41,9 @@ namespace BH.Engine.Clipper
         [Input("plane", "Optional plane for the Clipper boolean intersection. If null, the plane is fitted from the first polyline.")]
         [Input("tolerance", "Distance tolerance.")]
         [Output("intersects", "True if the polylines intersect.")]
-        public static bool PolygonIntersects(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
+        public static bool DoesIntersect(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
-                return false;
-
-            if (HasContainmentRelationship(poly1, poly2, tolerance))
                 return false;
 
             List<Polyline> intersection = Compute.BooleanIntersection(poly1, poly2, plane, tolerance);
@@ -61,7 +58,7 @@ namespace BH.Engine.Clipper
         [Input("plane", "Optional plane for comparison. If null, control points are compared in 3D.")]
         [Input("tolerance", "Distance tolerance.")]
         [Output("overlaps", "True if the polylines overlap.")]
-        public static bool PolygonOverlaps(this Polyline pLine1, Polyline pLine2, Plane plane = null, double tolerance = Tolerance.Distance)
+        public static bool IsSame(this Polyline pLine1, Polyline pLine2, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (pLine1 == null || pLine2 == null)
                 return false;
@@ -69,74 +66,17 @@ namespace BH.Engine.Clipper
             if (pLine1.ControlPoints.Count != pLine2.ControlPoints.Count)
                 return false;
 
-            if (plane == null)
-                return HasSameControlPoints(pLine1, pLine2, tolerance);
+            List<Point> points1 = pLine1.ControlPoints;
+            List<Point> points2 = pLine2.ControlPoints;
 
-            return HasSameControlPointsOnPlane(pLine1, pLine2, plane, tolerance);
-        }
+            if (plane != null)
+            {
+                points1 = points1.Select(p => p.Project(plane)).ToList();
+                points2 = points2.Select(p => p.Project(plane)).ToList();
+            }
 
-        /***************************************************/
-
-        [Description("Checks if a polyline is self-intersecting, optionally after projecting it onto a plane.")]
-        [Input("pLine", "Polyline to check.")]
-        [Input("plane", "Optional plane for the check. If null, the polyline is tested in 3D.")]
-        [Output("isSelfIntersecting", "True if self-intersecting.")]
-        public static bool IsSelfIntersectingPolygon(this Polyline pLine, Plane plane = null)
-        {
-            if (pLine == null || pLine.ControlPoints.Count < 3)
-                return false;
-
-            if (plane == null)
-                return pLine.IsSelfIntersecting();
-
-            Polyline projected = pLine.Project(plane);
-            return projected?.IsSelfIntersecting() ?? pLine.IsSelfIntersecting();
-        }
-
-        /***************************************************/
-
-        [Description("Checks if two polylines have the same control-point set within tolerance.")]
-        [Input("pLine1", "First polyline.")]
-        [Input("pLine2", "Second polyline.")]
-        [Input("tolerance", "Distance tolerance.")]
-        [Output("same", "True if every control point of the second polyline matches a control point of the first.")]
-        public static bool HasSameControlPoints(this Polyline pLine1, Polyline pLine2, double tolerance = Tolerance.Distance)
-        {
-            if (pLine1 == null || pLine2 == null)
-                return false;
-
-            if (pLine1.ControlPoints.Count != pLine2.ControlPoints.Count)
-                return false;
-
-            HashSet<Point> pointSet = new HashSet<Point>(pLine1.ControlPoints);
-            return pLine2.ControlPoints.All(point => pointSet.Any(p => p.IsEqual(point, tolerance)));
-        }
-
-        /***************************************************/
-        /****              Private methods              ****/
-        /***************************************************/
-
-        private static bool HasContainmentRelationship(Polyline poly1, Polyline poly2, double tolerance)
-        {
-            double extent1 = poly1.Bounds().DiagonalLength();
-            double extent2 = poly2.Bounds().DiagonalLength();
-
-            if (extent1 > extent2 && poly1.IsContaining(poly2, true, tolerance))
-                return true;
-
-            if (extent2 > extent1 && poly2.IsContaining(poly1, true, tolerance))
-                return true;
-
-            return false;
-        }
-
-        /***************************************************/
-
-        private static bool HasSameControlPointsOnPlane(Polyline pLine1, Polyline pLine2, Plane plane, double tolerance)
-        {
-            List<Point> points1 = pLine1.ControlPoints.Select(p => p.Project(plane)).ToList();
-            List<Point> points2 = pLine2.ControlPoints.Select(p => p.Project(plane)).ToList();
-            return HasSameControlPoints(new Polyline { ControlPoints = points1 }, new Polyline { ControlPoints = points2 }, tolerance);
+            //TODO: in points2, find all indices of points1[0]
+            //TODO: for each index, check if the sequence of points matches points1, considering wrap-around and tolerance
         }
 
         /***************************************************/
