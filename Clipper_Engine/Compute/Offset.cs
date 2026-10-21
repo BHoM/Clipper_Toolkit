@@ -40,10 +40,10 @@ namespace BH.Engine.Clipper
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
         [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards).")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
+        [Input("plane", "If null, processing is in 2D (the plane is fitted from the polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
         [Output("polylines", "Input polylines after offset.")]
-        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (polyline == null)
                 return null;
@@ -57,10 +57,10 @@ namespace BH.Engine.Clipper
                 return null;
             }
 
-            if (curvePlane == null)
+            if (plane == null)
             {
-                curvePlane = polyline.FitPlane();
-                if (polyline.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                plane = polyline.FitPlane();
+                if (polyline.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
                     return null;
@@ -68,7 +68,7 @@ namespace BH.Engine.Clipper
             }
 
             // Find orientation matrix to the global XY plane
-            TransformMatrix orientation = polyline.OrientationToGlobalXY(curvePlane, tolerance);
+            TransformMatrix orientation = polyline.OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
                 return null;
 
@@ -92,44 +92,6 @@ namespace BH.Engine.Clipper
             // Convert result back to 3D polylines
             List<Polyline> result = offsetPaths.ToPolylines(orientation, scale);
             return result;
-        }
-
-        /***************************************************/
-
-        [Description("Offset a closed planar polyline inward or outward, returning the largest valid result. Flips offset direction when the result unexpectedly grows or shrinks.")]
-        [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
-        [Input("distance", "The offset distance (positive magnitude).")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
-        [Input("inward", "If true, offsets inward; otherwise outward.")]
-        [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
-        [Output("polyline", "The offset polyline with the largest area, or null if invalid.")]
-        public static Polyline Offset(this Polyline polyline, double distance, Plane curvePlane = null, bool inward = false, double tolerance = Tolerance.Distance)
-        {
-            //TODO: this is a wrapper, not foundational method, move it to the client
-
-            if (polyline == null || distance == 0)
-                return polyline;
-
-            if (curvePlane == null)
-                curvePlane = polyline.FitPlane();
-
-            double signedDistance = inward ? -distance : distance;
-            Polyline offset = Offset(polyline, signedDistance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
-            if (offset == null || offset.ControlPoints.Count == 0)
-                return null;
-
-            double originalDiagonal = polyline.Bounds().DiagonalLength();
-            double offsetDiagonal = offset.Bounds().DiagonalLength();
-
-            if (inward && offsetDiagonal > originalDiagonal)
-                offset = Offset(polyline, distance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
-            else if (!inward && offsetDiagonal < originalDiagonal)
-                offset = Offset(polyline, -distance, curvePlane, tolerance).OrderByDescending(x => x.Area()).FirstOrDefault();
-
-            if (offset != null && offset.ControlPoints.Any())
-                return offset;
-
-            return null;
         }
 
         /***************************************************/

@@ -35,27 +35,10 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Checks if two polylines intersect on a plane without one fully containing the other.")]
-        [Input("poly1", "First polyline.")]
-        [Input("poly2", "Second polyline.")]
-        [Input("plane", "Optional plane for the Clipper boolean intersection. If null, the plane is fitted from the first polyline.")]
-        [Input("tolerance", "Distance tolerance.")]
-        [Output("intersects", "True if the polylines intersect.")]
-        public static bool DoesIntersect(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
-        {
-            if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
-                return false;
-
-            List<Polyline> intersection = Compute.BooleanIntersection(poly1, poly2, plane, tolerance);
-            return intersection != null && intersection.Count > 0;
-        }
-
-        /***************************************************/
-
-        [Description("Checks if two polylines have the same control points, optionally after projecting both onto a plane.")]
+        [Description("Checks if two polylines have the same control points. If plane is null, comparison is in 2D. If plane is not null, 3D control points are projected onto the plane before comparison.")]
         [Input("pLine1", "First polyline.")]
         [Input("pLine2", "Second polyline.")]
-        [Input("plane", "Optional plane for comparison. If null, control points are compared in 3D.")]
+        [Input("plane", "If null, comparison is in 2D (control points compared directly). If not null, 3D control points are projected onto this plane before comparison.")]
         [Input("tolerance", "Distance tolerance.")]
         [Output("overlaps", "True if the polylines overlap.")]
         public static bool IsSame(this Polyline pLine1, Polyline pLine2, Plane plane = null, double tolerance = Tolerance.Distance)
@@ -75,8 +58,28 @@ namespace BH.Engine.Clipper
                 points2 = points2.Select(p => p.Project(plane)).ToList();
             }
 
-            //TODO: in points2, find all indices of points1[0]
-            //TODO: for each index, check if the sequence of points matches points1, considering wrap-around and tolerance
+            int count = points1.Count;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (!points2[i].IsEqual(points1[0], tolerance))
+                    continue;
+
+                bool matches = true;
+                for (int j = 0; j < count; j++)
+                {
+                    if (!points1[j].IsEqual(points2[(i + j) % count], tolerance))
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches)
+                    return true;
+            }
+
+            return false;
         }
 
         /***************************************************/

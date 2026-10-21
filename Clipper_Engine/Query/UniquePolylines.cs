@@ -36,10 +36,10 @@ namespace BH.Engine.Clipper
 
         [Description("Filters polylines to return only unique ones, optionally checking for self-intersections and overlaps on a plane.")]
         [Input("polylines", "The collection of polylines to filter.")]
-        [Input("clipPlane", "Optional plane for overlap and self-intersection detection.")]
+        [Input("plane", "If null, comparison is in 2D (control points compared directly). If not null, 3D control points are projected onto this plane before comparison.")]
         [Input("checkSelfIntersection", "Whether to exclude self-intersecting polylines (defaults to false).")]
         [Output("unique", "A list of unique non-overlapping polylines.")]
-        public static List<Polyline> UniquePolylines(this IEnumerable<Polyline> polylines, Plane clipPlane = null, bool checkSelfIntersection = false)
+        public static List<Polyline> UniquePolylines(this IEnumerable<Polyline> polylines, Plane plane = null, bool checkSelfIntersection = false)
         {
             if (polylines == null)
                 return new List<Polyline>();
@@ -50,7 +50,7 @@ namespace BH.Engine.Clipper
                 if (polyline == null)
                     continue;
 
-                if (!uniquePolylines.Any(x => x.IsSame(polyline)))
+                if (!uniquePolylines.Any(x => x.IsSame(polyline, plane)))
                     uniquePolylines.Add(polyline);
             }
 

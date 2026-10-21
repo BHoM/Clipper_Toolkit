@@ -45,22 +45,16 @@ namespace BH.Engine.Clipper
             if (point == null || surface?.ExternalBoundary == null)
                 return false;
 
-            //TODO: check if all outlines are polyline
-            Polyline outer = surface.ExternalBoundary as Polyline;
-            if (outer == null)
-            {
-                BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
-                return false;
-            }
-
-            List<Polyline> inner = surface.InternalBoundaries?.Select(x => x as Polyline).Where(x => x != null).ToList() ?? new List<Polyline>();
-            if (inner.Count != surface.InternalBoundaries?.Count)
+            if (!TryGetPolylineBoundaries(surface, out Polyline outer, out List<Polyline> inner))
             {
                 BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
                 return false;
             }
 
             Plane plane = surface.FitPlane(tolerance);
+            if (!point.IsInPlane(plane, tolerance))
+                return false;
+
             return point.IsOnFace(outer, inner, plane, tolerance);
 
         }
@@ -72,22 +66,55 @@ namespace BH.Engine.Clipper
         //[Input("surface", "A planar surface that can have internal boundaries/holes.")]
         //[Input("tolerance", "Distance tolerance for the containment check.")]
         //[Output("isOnFace", "True if the point is inside the outer boundary and not inside a hole.")]
-        public static bool IsOnFace(this Point point, Polyline outer, List<Polyline> inner, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static bool IsOnFace(this Point point, Polyline outer, List<Polyline> inner, Plane plane = null, double tolerance = Tolerance.Distance)
         {
-            if (curvePlane == null)
+            if (point == null || outer == null)
+                return false;
+
+            if (plane == null)
             {
-                curvePlane = outer?.FitPlane(tolerance);
-                if (outer != null && (outer.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)) || inner.Any(y => y.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))))
+                plane = outer.FitPlane(tolerance);
+                if (outer.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)) || inner.Any(y => y != null && y.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance))))
                 {
                     Base.Compute.RecordError("Clipper IsOnFace method only works for coplanar polylines.");
                     return false;
                 }
 
-                if (!point.IsInPlane(curvePlane, tolerance) == false)
+                if (!point.IsInPlane(plane, tolerance))
                     return false;
             }
 
-            return outer.IsContaining(point, curvePlane, true, tolerance) && !inner.Any(x => x != null && x.IsContaining(point, curvePlane, false, tolerance));
+            return outer.IsContaining(point, plane, true, tolerance) && !inner.Any(x => x != null && x.IsContaining(point, plane, false, tolerance));
+        }
+
+        /***************************************************/
+        /****              Private methods              ****/
+        /***************************************************/
+
+        private static bool TryGetPolylineBoundaries(PlanarSurface surface, out Polyline outer, out List<Polyline> inner)
+        {
+            outer = null;
+            inner = new List<Polyline>();
+
+            Polyline externalPolyline = surface.ExternalBoundary as Polyline;
+            if (externalPolyline == null)
+                return false;
+
+            outer = externalPolyline;
+
+            if (surface.InternalBoundaries == null)
+                return true;
+
+            foreach (ICurve boundary in surface.InternalBoundaries)
+            {
+                Polyline innerPolyline = boundary as Polyline;
+                if (innerPolyline == null)
+                    return false;
+
+                inner.Add(innerPolyline);
+            }
+
+            return true;
         }
 
         /***************************************************/

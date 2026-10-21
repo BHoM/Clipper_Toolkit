@@ -40,32 +40,32 @@ namespace BH.Engine.Clipper
         [Description("Perform a boolean intersection operation between two polylines using Clipper2.")]
         [Input("poly1", "The first polyline for intersection.")]
         [Input("poly2", "The second polyline for intersection.")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the first polyline.")]
+        [Input("plane", "If null, processing is in 2D (the plane is fitted from the first polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the intersection of the two input polylines.")]
-        public static List<Polyline> BooleanIntersection(this Polyline poly1, Polyline poly2, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static List<Polyline> BooleanIntersection(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
                 return null;
 
-            if (curvePlane == null)
+            if (plane == null)
             {
-                curvePlane = poly1.FitPlane();
-                if (poly1.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                plane = poly1.FitPlane();
+                if (poly1.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                {
+                    Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
+                    return null;
+                }
+
+                if (poly2.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
                     return null;
                 }
             }
 
-            if (poly2.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
-            {
-                Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
-                return null;
-            }
-
             // Find the orientation matrix to the global XY plane
-            TransformMatrix orientation = poly1.OrientationToGlobalXY(curvePlane, tolerance);
+            TransformMatrix orientation = poly1.OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
                 return null;
 
