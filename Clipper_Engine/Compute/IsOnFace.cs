@@ -76,7 +76,7 @@ namespace BH.Engine.Clipper
                 plane = outer.FitPlane(tolerance);
                 if (outer.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)) || inner.Any(y => y != null && y.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance))))
                 {
-                    Base.Compute.RecordError("Clipper IsOnFace method only works for coplanar polylines.");
+                    Base.Compute.RecordError("Clipper IsOnFace method only works for planar polylines.");
                     return false;
                 }
 

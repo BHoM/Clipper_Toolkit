@@ -100,7 +100,7 @@ namespace BH.Engine.Clipper
         [Input("acceptOnEdge", "If true, a point on the boundary is accepted.")]
         [Input("tolerance", "Distance tolerance used for orientation and scaling.")]
         [Output("isContaining", "True if the point is inside the polyline.")]
-        public static bool IsContaining(this Polyline outer, Point point, Plane plane, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline outer, Point point, Plane plane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
             if (point == null)
                 return false;
@@ -117,7 +117,7 @@ namespace BH.Engine.Clipper
         [Input("acceptOnEdge", "If true, points on the boundary are accepted.")]
         [Input("tolerance", "Distance tolerance used for orientation and scaling.")]
         [Output("isContaining", "True if the line start, end, and midpoint are inside the polyline.")]
-        public static bool IsContaining(this Polyline outer, Line line, Plane plane, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline outer, Line line, Plane plane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
             if (outer == null || line == null || plane == null)
                 return false;
@@ -151,7 +151,7 @@ namespace BH.Engine.Clipper
 
                 if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
                     return false;
                 }
             }
@@ -187,7 +187,7 @@ namespace BH.Engine.Clipper
             {
                 if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
+                    Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
                     return false;
                 }
 
