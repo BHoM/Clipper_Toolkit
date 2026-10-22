@@ -45,7 +45,8 @@ namespace BH.Engine.Clipper
             if (point == null || surface?.ExternalBoundary == null)
                 return false;
 
-            if (!TryGetPolylineBoundaries(surface, out Polyline outer, out List<Polyline> inner))
+            (Polyline outer, List<Polyline> inner) = PolylineBoundaries(surface);
+            if (outer == null)
             {
                 BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
                 return false;
@@ -91,30 +92,26 @@ namespace BH.Engine.Clipper
         /****              Private methods              ****/
         /***************************************************/
 
-        private static bool TryGetPolylineBoundaries(PlanarSurface surface, out Polyline outer, out List<Polyline> inner)
+        private static (Polyline outer, List<Polyline> inner) PolylineBoundaries(PlanarSurface surface)
         {
-            outer = null;
-            inner = new List<Polyline>();
+            Polyline outer = surface.ExternalBoundary as Polyline;
+            if (outer == null)
+                return (null, null);
 
-            Polyline externalPolyline = surface.ExternalBoundary as Polyline;
-            if (externalPolyline == null)
-                return false;
-
-            outer = externalPolyline;
-
+            List<Polyline> inner = new List<Polyline>();
             if (surface.InternalBoundaries == null)
-                return true;
+                return (outer, inner);
 
             foreach (ICurve boundary in surface.InternalBoundaries)
             {
                 Polyline innerPolyline = boundary as Polyline;
                 if (innerPolyline == null)
-                    return false;
+                    return (null, null);
 
                 inner.Add(innerPolyline);
             }
 
-            return true;
+            return (outer, inner);
         }
 
         /***************************************************/

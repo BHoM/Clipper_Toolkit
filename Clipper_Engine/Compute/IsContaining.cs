@@ -181,16 +181,19 @@ namespace BH.Engine.Clipper
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
+
+                foreach (Polyline refRegion in refRegions)
+                {
+                    if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                    {
+                        Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
+                        return false;
+                    }
+                }
             }
 
             foreach (Polyline refRegion in refRegions)
             {
-                if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
-                {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
-                    return false;
-                }
-
                 if (!region.IsContaining(refRegion, plane, tolerance))
                     return false;
             }
