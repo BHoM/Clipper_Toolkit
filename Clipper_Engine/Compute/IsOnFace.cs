@@ -72,6 +72,12 @@ namespace BH.Engine.Clipper
             if (point == null || outer == null)
                 return false;
 
+            if (!outer.IsClosed(tolerance))
+                return false;
+
+            if (inner != null && inner.Any(x => x != null && !x.IsClosed(tolerance)))
+                return false;
+
             if (plane == null)
             {
                 plane = outer.FitPlane(tolerance);

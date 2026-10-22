@@ -48,6 +48,12 @@ namespace BH.Engine.Clipper
             if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
                 return null;
 
+            if (!poly1.IsClosed(tolerance) || !poly2.IsClosed(tolerance))
+            {
+                Base.Compute.RecordError("Boolean Intersection works on closed regions.");
+                return new List<Polyline>();
+            }
+
             if (plane == null)
             {
                 plane = poly1.FitPlane();

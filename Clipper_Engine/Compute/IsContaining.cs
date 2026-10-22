@@ -49,6 +49,9 @@ namespace BH.Engine.Clipper
             if (region == null || points == null || region.ControlPoints.Count < 3 || points.Count == 0)
                 return false;
 
+            if (!region.IsClosed(tolerance))
+                return false;
+
             if (plane == null)
             {
                 plane = region.FitPlane();
@@ -110,24 +113,6 @@ namespace BH.Engine.Clipper
 
         /***************************************************/
 
-        [Description("Checks if a line is contained in a polyline on the given plane, using Clipper2 point-in-polygon on the line start, end, and midpoint.")]
-        [Input("outer", "Closed polyline region.")]
-        [Input("line", "Line to test.")]
-        [Input("plane", "If not null, 3D geometry is projected onto this plane for the Clipper test (required for this overload).")]
-        [Input("acceptOnEdge", "If true, points on the boundary are accepted.")]
-        [Input("tolerance", "Distance tolerance used for orientation and scaling.")]
-        [Output("isContaining", "True if the line start, end, and midpoint are inside the polyline.")]
-        public static bool IsContaining(this Polyline outer, Line line, Plane plane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
-        {
-            if (outer == null || line == null || plane == null)
-                return false;
-
-            Point mid = (line.Start + line.End) * 0.5;
-            return outer.IsContaining(new List<Point> { line.Start, line.End, mid }, plane, acceptOnEdge, tolerance);
-        }
-
-        /***************************************************/
-
         [Description("Returns true if the reference polyline is fully contained within the region polyline. " +
             "Both polylines must be planar and coplanar. Optionally specify the plane and tolerance.")]
         [Input("region", "The outer polyline region to test for containment.")]
@@ -138,6 +123,9 @@ namespace BH.Engine.Clipper
         public static bool IsContaining(this Polyline region, Polyline refRegion, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
+                return false;
+
+            if (!region.IsClosed(tolerance) || !refRegion.IsClosed(tolerance))
                 return false;
 
             if (plane == null)
@@ -170,6 +158,12 @@ namespace BH.Engine.Clipper
         [Output("contains", "True if all reference polylines are fully contained within the region polyline, false otherwise.")]
         public static bool IsContaining(this Polyline region, List<Polyline> refRegions, Plane plane = null, double tolerance = Tolerance.Distance)
         {
+            if (region == null || refRegions == null || !region.IsClosed(tolerance))
+                return false;
+
+            if (refRegions.Any(x => x == null || !x.IsClosed(tolerance)))
+                return false;
+
             if (plane == null)
             {
                 plane = region.FitPlane();

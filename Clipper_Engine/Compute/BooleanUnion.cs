@@ -55,6 +55,12 @@ namespace BH.Engine.Clipper
             if (validPolylines.Count == 1)
                 return new List<Polyline> { validPolylines[0] };
 
+            if (validPolylines.Any(x => !x.IsClosed(tolerance)))
+            {
+                Base.Compute.RecordError("Boolean Union works on closed regions.");
+                return new List<Polyline>();
+            }
+
             if (plane == null)
             {
                 plane = validPolylines[0].FitPlane();

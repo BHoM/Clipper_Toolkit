@@ -67,6 +67,12 @@ namespace BH.Engine.Clipper
                     return new List<Polyline> { region };
             }
 
+            if (!region.IsClosed(tolerance) || clipRegions.Any(x => !x.IsClosed(tolerance)))
+            {
+                Base.Compute.RecordError("Boolean Difference works on closed regions.");
+                return new List<Polyline> { region };
+            }
+
             // Find the orientation matrix to the global XY plane
             TransformMatrix orientation = region.OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
