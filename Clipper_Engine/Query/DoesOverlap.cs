@@ -20,7 +20,6 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
-using BH.Engine.Geometry;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using System.Collections.Generic;
@@ -39,7 +38,7 @@ namespace BH.Engine.Clipper
         [Input("plane", "If null, processing is in 2D (the plane is fitted from the first polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Distance tolerance.")]
         [Output("intersects", "True if the polylines intersect.")]
-        public static bool DoesIntersect(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
+        public static bool DoesOverlap(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
                 return false;

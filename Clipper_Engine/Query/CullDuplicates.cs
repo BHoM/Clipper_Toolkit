@@ -35,51 +35,26 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Checks if two polylines have the same control points. If plane is null, comparison is in 2D. If plane is not null, 3D control points are projected onto the plane before comparison.")]
-        [Input("pLine1", "First polyline.")]
-        [Input("pLine2", "Second polyline.")]
-        [Input("plane", "If null, comparison is in 2D (control points compared directly). If not null, 3D control points are projected onto this plane before comparison.")]
-        [Input("tolerance", "Distance tolerance.")]
-        [Output("overlaps", "True if the polylines overlap.")]
-        public static bool IsSame(this Polyline pLine1, Polyline pLine2, Plane plane = null, double tolerance = Tolerance.Distance)
+        [Description("Removes duplicate polylines. Two polylines are duplicates when their control points are equal in the same order. Either list may be shifted, so a different starting point still counts as a duplicate. If plane is null, control points are compared directly. If plane is not null, they are projected onto the plane before comparison.")]
+        [Input("polylines", "The collection of polylines to cull duplicates from.")]
+        [Input("plane", "If null, control points are compared directly. If not null, control points are projected onto this plane before comparison.")]
+        [Output("polylines", "The collection of polylines with duplicates removed.")]
+        public static List<Polyline> CullDuplicates(this IEnumerable<Polyline> polylines, Plane plane = null)
         {
-            if (pLine1 == null || pLine2 == null)
-                return false;
+            if (polylines == null)
+                return new List<Polyline>();
 
-            if (pLine1.ControlPoints.Count != pLine2.ControlPoints.Count)
-                return false;
-
-            List<Point> points1 = pLine1.ControlPoints;
-            List<Point> points2 = pLine2.ControlPoints;
-
-            if (plane != null)
+            List<Polyline> culled = new List<Polyline>();
+            foreach (Polyline polyline in polylines)
             {
-                points1 = points1.Select(p => p.Project(plane)).ToList();
-                points2 = points2.Select(p => p.Project(plane)).ToList();
-            }
-
-            int count = points1.Count;
-
-            for (int i = 0; i < count; i++)
-            {
-                if (!points2[i].IsEqual(points1[0], tolerance))
+                if (polyline == null)
                     continue;
 
-                bool matches = true;
-                for (int j = 0; j < count; j++)
-                {
-                    if (!points1[j].IsEqual(points2[(i + j) % count], tolerance))
-                    {
-                        matches = false;
-                        break;
-                    }
-                }
-
-                if (matches)
-                    return true;
+                if (!culled.Any(x => x.IsSame(polyline, plane)))
+                    culled.Add(polyline);
             }
 
-            return false;
+            return culled;
         }
 
         /***************************************************/
