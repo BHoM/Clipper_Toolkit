@@ -25,6 +25,7 @@ using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using Clipper2Lib;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -109,6 +110,48 @@ namespace BH.Engine.Clipper
                 return false;
 
             return outer.IsContaining(new List<Point> { point }, plane, acceptOnEdge, tolerance);
+        }
+
+        /***************************************************/
+
+        [Description("Checks whether the whole line lies inside a polyline. Boundary intersections split the line, and one point between each pair is tested with the Clipper point containment method.")]
+        [Input("region", "Closed polyline region.")]
+        [Input("line", "Line to test.")]
+        [Input("acceptOnEdge", "If true, a sample on the boundary is accepted.")]
+        [Input("tolerance", "Distance tolerance used for intersections and for the Clipper point test.")]
+        [Output("IsContaining", "True if every sampled point of the line is inside the polyline.")]
+        public static bool IsContaining(this Polyline region, Line line, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        {
+            if (region == null || line == null)
+                return false;
+
+            List<double> parameters = new List<double> { 0, 1 };
+            foreach (Line edge in region.SubParts())
+            {
+                foreach (Point crossPoint in edge.LineIntersections(line, false, tolerance))
+                {
+                    double x = line.ParameterAtPoint(crossPoint, tolerance);
+                    if (x > 0 && x < 1)
+                        parameters.Add(x);
+                }
+            }
+
+            parameters.Sort();
+
+            if (!acceptOnEdge && parameters.Count > 2)
+                return false;
+
+            double length = line.Length();
+            List<Point> listPoints = new List<Point> { line.Start, line.End };
+            for (int i = 0; i < parameters.Count - 1; i++)
+            {
+                if (Math.Abs(parameters[i + 1] - parameters[i]) * length <= tolerance)
+                    continue;
+
+                listPoints.Add(line.PointAtParameter((parameters[i] + parameters[i + 1]) * 0.5));
+            }
+
+            return IsContaining(region, listPoints, null, acceptOnEdge, tolerance);
         }
 
         /***************************************************/
