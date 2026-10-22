@@ -156,9 +156,6 @@ namespace BH.Engine.Clipper
                 }
             }
 
-            if (region.IsContaining(refRegion.ControlPoints, plane, true, tolerance) == false)
-                return false;
-
             //If refRegion sits fully inside the outer region, the boolean difference result should be empty
             return refRegion.BooleanDifference(new List<Polyline> { region }, plane, tolerance)?.Count == 0;
         }
