@@ -58,9 +58,6 @@ namespace BH.Engine.Clipper
                 plane = region.FitPlane();
                 if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
-                    // #region agent log
-                    DebugLogNonPlanar("points", region, plane, tolerance);
-                    // #endregion
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
@@ -179,9 +176,6 @@ namespace BH.Engine.Clipper
                 plane = region.FitPlane();
                 if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
-                    // #region agent log
-                    DebugLogNonPlanar("polyline", region, plane, tolerance);
-                    // #endregion
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
@@ -218,9 +212,6 @@ namespace BH.Engine.Clipper
                 plane = region.FitPlane();
                 if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
-                    // #region agent log
-                    DebugLogNonPlanar("polylineList", region, plane, tolerance);
-                    // #endregion
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
@@ -243,106 +234,6 @@ namespace BH.Engine.Clipper
 
             return true;
         }
-
-        /***************************************************/
-
-        // #region agent log
-        private static int s_DebugNonPlanarLogs;
-
-        private static void DebugLogNonPlanar(string overload, Polyline region, Plane plane, double tolerance)
-        {
-            try
-            {
-                int n = System.Threading.Interlocked.Increment(ref s_DebugNonPlanarLogs);
-                if (n > 20)
-                    return;
-
-                double maxDist = -1;
-                int offCount = 0;
-                int pointCount = region?.ControlPoints?.Count ?? 0;
-                double zMin = 0, zMax = 0, xSpan = 0, ySpan = 0;
-                if (pointCount > 0)
-                {
-                    zMin = double.MaxValue;
-                    zMax = double.MinValue;
-                    double xMin = double.MaxValue, xMax = double.MinValue, yMin = double.MaxValue, yMax = double.MinValue;
-                    foreach (Point pt in region.ControlPoints)
-                    {
-                        if (pt == null)
-                            continue;
-                        if (pt.X < xMin) xMin = pt.X;
-                        if (pt.X > xMax) xMax = pt.X;
-                        if (pt.Y < yMin) yMin = pt.Y;
-                        if (pt.Y > yMax) yMax = pt.Y;
-                        if (pt.Z < zMin) zMin = pt.Z;
-                        if (pt.Z > zMax) zMax = pt.Z;
-                        if (plane != null)
-                        {
-                            double d = pt.Distance(plane);
-                            if (d > maxDist) maxDist = d;
-                            if (d > tolerance) offCount++;
-                        }
-                    }
-                    xSpan = xMax - xMin;
-                    ySpan = yMax - yMin;
-                }
-
-                Plane fitWithTol = region?.FitPlane(tolerance);
-                double nx = plane?.Normal?.X ?? double.NaN;
-                double ny = plane?.Normal?.Y ?? double.NaN;
-                double nz = plane?.Normal?.Z ?? double.NaN;
-                double nLen = plane?.Normal == null ? double.NaN : Math.Sqrt(nx * nx + ny * ny + nz * nz);
-
-                var st = new System.Diagnostics.StackTrace(1, false);
-                string stack = "";
-                int frames = Math.Min(8, st.FrameCount);
-                for (int i = 0; i < frames; i++)
-                {
-                    System.Reflection.MethodBase method = st.GetFrame(i)?.GetMethod();
-                    if (method == null)
-                        continue;
-                    string typeName = method.DeclaringType != null ? method.DeclaringType.Name : "?";
-                    stack += typeName + "." + method.Name + ">";
-                }
-
-                int containingFrames = 0;
-                int idx = 0;
-                while ((idx = stack.IndexOf("IsContaining>", idx, StringComparison.Ordinal)) >= 0)
-                {
-                    containingFrames++;
-                    idx += 14;
-                }
-
-                bool lineOverload = containingFrames >= 2;
-                string hypothesisId = "H1";
-                if (fitWithTol == null)
-                    hypothesisId = "H5";
-                else if (double.IsNaN(nLen) || nLen < 0.5 || nLen > 1.5)
-                    hypothesisId = "H3";
-                else if (maxDist >= 0 && maxDist < 0.001)
-                    hypothesisId = "H2";
-                else if (lineOverload)
-                    hypothesisId = "H4";
-
-                string D(double v) => (double.IsNaN(v) || double.IsInfinity(v)) ? "null" : v.ToString("G17", System.Globalization.CultureInfo.InvariantCulture);
-                string json = "{\"sessionId\":\"1bcc72\",\"runId\":\"pre-fix\",\"hypothesisId\":\"" + hypothesisId
-                    + "\",\"location\":\"IsContaining.cs\",\"message\":\"nonplanar region\",\"data\":{\"n\":" + n
-                    + ",\"overload\":\"" + overload + "\",\"pointCount\":" + pointCount
-                    + ",\"offCount\":" + offCount + ",\"maxDist\":" + D(maxDist)
-                    + ",\"tolerance\":" + D(tolerance) + ",\"fitWithTolNull\":" + (fitWithTol == null ? "true" : "false")
-                    + ",\"lineOverload\":" + (lineOverload ? "true" : "false")
-                    + ",\"normal\":[" + D(nx) + "," + D(ny) + "," + D(nz) + "],\"normalLen\":" + D(nLen)
-                    + ",\"xSpan\":" + D(xSpan) + ",\"ySpan\":" + D(ySpan)
-                    + ",\"zMin\":" + D(zMin) + ",\"zMax\":" + D(zMax)
-                    + ",\"stack\":\"" + stack.Replace("\\", "").Replace("\"", "'") + "\"},\"timestamp\":"
-                    + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}";
-                System.IO.File.AppendAllText(@"C:\_repos\Revit_Tagging_Tool\debug-1bcc72.log", json + "\n");
-            }
-            catch
-            {
-            }
-        }
-        // #endregion
 
         /***************************************************/
     }
