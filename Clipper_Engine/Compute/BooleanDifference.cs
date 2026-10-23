@@ -37,13 +37,13 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Perform a boolean difference operation between a main region and a list of reference regions using Clipper2.")]
+        [Description("Perform a boolean difference operation between a main region and a list of reference regions using Clipper2. Reference regions that do not lie on the subject plane are skipped, and the subject is kept.")]
         [Input("region", "The main polyline region to subtract from.")]
-        [Input("refRegions", "List of reference polylines to subtract from the main region.")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the main region.")]
+        [Input("refRegions", "List of reference polylines to subtract from the main region. Regions off the subject plane are ignored.")]
+        [Input("plane", "If null, processing is in 2D (the plane is fitted from the main region). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the difference (main region minus reference regions).")]
-        public static List<Polyline> BooleanDifference(this Polyline region, List<Polyline> refRegions, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static List<Polyline> BooleanDifference(this Polyline region, List<Polyline> refRegions, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (region == null || refRegions == null || region.ControlPoints.Count < 3)
                 return null;
@@ -52,24 +52,29 @@ namespace BH.Engine.Clipper
             if (clipRegions.Count == 0)
                 return new List<Polyline> { region };
 
-            if (curvePlane == null)
+            if (plane == null)
             {
-                curvePlane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                plane = region.FitPlane();
+                if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
                     return null;
                 }
+
+                // An opening on another plane must not discard the subject. Subtract only the clips that lie on this plane.
+                clipRegions = clipRegions.Where(x => x.ControlPoints.All(y => y != null && y.IsInPlane(plane, tolerance))).ToList();
+                if (clipRegions.Count == 0)
+                    return new List<Polyline> { region };
             }
 
-            if (clipRegions.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
+            if (!region.IsClosed(tolerance) || clipRegions.Any(x => !x.IsClosed(tolerance)))
             {
-                Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
-                return null;
+                Base.Compute.RecordError("Boolean Difference works on closed regions.");
+                return new List<Polyline> { region };
             }
 
             // Find the orientation matrix to the global XY plane
-            TransformMatrix orientation = region.OrientationToGlobalXY(curvePlane, tolerance);
+            TransformMatrix orientation = region.OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
                 return null;
 

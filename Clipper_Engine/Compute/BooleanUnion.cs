@@ -39,10 +39,10 @@ namespace BH.Engine.Clipper
 
         [Description("Perform a boolean union operation between multiple polylines using Clipper2.")]
         [Input("polylines", "List of polylines to union together.")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the first polyline.")]
+        [Input("plane", "If null, processing is in 2D (the plane is fitted from the first polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Tolerance for planarity checks and numerical precision. Default is Tolerance.Distance.")]
         [Output("result", "List of polylines representing the union of all input polylines.")]
-        public static List<Polyline> BooleanUnion(this List<Polyline> polylines, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static List<Polyline> BooleanUnion(this List<Polyline> polylines, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (polylines == null || polylines.Count == 0)
                 return new List<Polyline>();
@@ -55,10 +55,16 @@ namespace BH.Engine.Clipper
             if (validPolylines.Count == 1)
                 return new List<Polyline> { validPolylines[0] };
 
-            if (curvePlane == null)
+            if (validPolylines.Any(x => !x.IsClosed(tolerance)))
             {
-                curvePlane = validPolylines[0].FitPlane();
-                if (validPolylines.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(curvePlane, tolerance))))
+                Base.Compute.RecordError("Boolean Union works on closed regions.");
+                return new List<Polyline>();
+            }
+
+            if (plane == null)
+            {
+                plane = validPolylines[0].FitPlane();
+                if (validPolylines.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(plane, tolerance))))
                 {
                     Base.Compute.RecordError("Clipper BooleanUnion method only works for coplanar polylines.");
                     return new List<Polyline>();
@@ -66,7 +72,7 @@ namespace BH.Engine.Clipper
             }
 
             // Find the orientation matrix to the global XY plane
-            TransformMatrix orientation = validPolylines[0].OrientationToGlobalXY(curvePlane, tolerance);
+            TransformMatrix orientation = validPolylines[0].OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
                 return new List<Polyline>();
 

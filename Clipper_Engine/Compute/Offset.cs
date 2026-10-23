@@ -40,10 +40,10 @@ namespace BH.Engine.Clipper
         [Description("Offset a curve by the given distance (using Clipper http://www.angusj.com/delphi/clipper.php). Method only works for closed, planar polylines.")]
         [Input("polyline", "A BHoM Polyline representing the curve to offset.")]
         [Input("distance", "The distance by which to offset the curve (-Ve is inwards).")]
-        [Input("curvePlane", "Optional plane for the geometry. If null, will be fitted from the polyline.")]
+        [Input("plane", "If null, processing is in 2D (the plane is fitted from the polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Tolerance to be used for planarity and closedness checks as well as for offset computations.")]
         [Output("polylines", "Input polylines after offset.")]
-        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane curvePlane = null, double tolerance = Tolerance.Distance)
+        public static List<Polyline> Offset(this Polyline polyline, double distance = 0, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (polyline == null)
                 return null;
@@ -57,10 +57,10 @@ namespace BH.Engine.Clipper
                 return null;
             }
 
-            if (curvePlane == null)
+            if (plane == null)
             {
-                curvePlane = polyline.FitPlane();
-                if (polyline.ControlPoints.Any(x => !x.IsInPlane(curvePlane, tolerance)))
+                plane = polyline.FitPlane();
+                if (polyline.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
                     return null;
@@ -68,7 +68,7 @@ namespace BH.Engine.Clipper
             }
 
             // Find orientation matrix to the global XY plane
-            TransformMatrix orientation = polyline.OrientationToGlobalXY(curvePlane, tolerance);
+            TransformMatrix orientation = polyline.OrientationToGlobalXY(plane, tolerance);
             if (orientation == null)
                 return null;
 
