@@ -119,8 +119,9 @@ namespace BH.Engine.Clipper
         [Input("line", "Line to test.")]
         [Input("acceptOnEdge", "If true, a sample on the boundary is accepted.")]
         [Input("tolerance", "Distance tolerance used for intersections and for the Clipper point test.")]
+        [Input("plane", "If null, the plane is fitted from the region when required by Clipper.")]
         [Output("IsContaining", "True if every sampled point of the line is inside the polyline.")]
-        public static bool IsContaining(this Polyline region, Line line, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline region, Line line, bool acceptOnEdge = true, double tolerance = Tolerance.Distance, Plane plane = null)
         {
             if (region == null || line == null)
                 return false;
@@ -151,7 +152,7 @@ namespace BH.Engine.Clipper
                 listPoints.Add(line.PointAtParameter((parameters[i] + parameters[i + 1]) * 0.5));
             }
 
-            return IsContaining(region, listPoints, null, acceptOnEdge, tolerance);
+            return IsContaining(region, listPoints, plane, acceptOnEdge, tolerance);
         }
 
         /***************************************************/
