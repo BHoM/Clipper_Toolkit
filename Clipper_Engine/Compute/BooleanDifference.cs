@@ -55,7 +55,7 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper BooleanDifference method only works for coplanar polylines.");
                     return null;

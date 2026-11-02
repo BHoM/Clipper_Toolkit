@@ -56,15 +56,16 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
-
-                if (points.Any(x => !x.IsInPlane(plane, tolerance)))
-                    return false;
             }
+
+            // A point that does not lie on the plane is outside the region.
+            if (points.Any(x => !x.IsInPlane(plane, tolerance)))
+                return false;
 
             // Find the orientation matrix to the global XY plane
             TransformMatrix orientation = region.OrientationToGlobalXY(plane, tolerance);
@@ -175,18 +176,15 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
-
-                if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
-                {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
-                    return false;
-                }
             }
+
+            if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                return false;
 
             //If refRegion sits fully inside the outer region, the boolean difference result should be empty
             return refRegion.BooleanDifference(new List<Polyline> { region }, plane, tolerance)?.Count == 0;
@@ -211,20 +209,17 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = region.FitPlane();
-                if (region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
                     return false;
                 }
+            }
 
-                foreach (Polyline refRegion in refRegions)
-                {
-                    if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
-                    {
-                        Base.Compute.RecordError("Clipper IsContaining method only works for coplanar polylines.");
-                        return false;
-                    }
-                }
+            foreach (Polyline refRegion in refRegions)
+            {
+                if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                    return false;
             }
 
             foreach (Polyline refRegion in refRegions)

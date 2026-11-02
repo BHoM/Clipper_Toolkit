@@ -64,7 +64,7 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = validPolylines[0].FitPlane();
-                if (validPolylines.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(plane, tolerance))))
+                if (plane == null || validPolylines.Any(x => x.ControlPoints.Any(y => !y.IsInPlane(plane, tolerance))))
                 {
                     Base.Compute.RecordError("Clipper BooleanUnion method only works for coplanar polylines.");
                     return new List<Polyline>();

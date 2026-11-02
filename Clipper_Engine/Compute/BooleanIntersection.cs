@@ -57,7 +57,7 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = poly1.FitPlane();
-                if (poly1.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || poly1.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper BooleanIntersection method only works for coplanar polylines.");
                     return null;

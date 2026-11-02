@@ -60,7 +60,7 @@ namespace BH.Engine.Clipper
             if (plane == null)
             {
                 plane = polyline.FitPlane();
-                if (polyline.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                if (plane == null || polyline.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                 {
                     Base.Compute.RecordError("Clipper Offset method only works for planar polylines.");
                     return null;
