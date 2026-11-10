@@ -53,22 +53,46 @@ namespace BH.Engine.Clipper
             if (!region.IsClosed(tolerance))
                 return false;
 
-            if (plane == null)
+            // Layout global XY (after view transform): use raw X/Y — avoids planarity errors on sections.
+            if (plane != null && IsGlobalXYPlane(plane))
             {
-                plane = region.FitPlane();
-                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                foreach (Point pnt in points)
                 {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
-                    return false;
+                    if (!region.IsContainingOnGlobalXY(pnt, acceptOnEdge, tolerance))
+                        return false;
                 }
+
+                return true;
             }
 
-            // A point that does not lie on the plane is outside the region.
-            if (points.Any(x => !x.IsInPlane(plane, tolerance)))
-                return false;
+            // One plane for projection + OrientationToGlobalXY: prefer the fitted plane of the region when it is planar,
+            // so the transform matches the polygon; otherwise use the supplied plane (e.g. view WorkPlane).
+            Plane slabPlane;
+            if (plane == null)
+            {
+                slabPlane = region.FitPlane();
+                if (slabPlane == null || region.ControlPoints.Any(x => !x.IsInPlane(slabPlane, tolerance)))
+                {
+                    foreach (Point pnt in points)
+                    {
+                        if (!region.IsContainingOnGlobalXY(pnt, acceptOnEdge, tolerance))
+                            return false;
+                    }
+
+                    return true;
+                }
+            }
+            else
+            {
+                Plane fitted = region.FitPlane(tolerance);
+                if (fitted != null && !region.ControlPoints.Any(x => !x.IsInPlane(fitted, tolerance)))
+                    slabPlane = fitted;
+                else
+                    slabPlane = plane;
+            }
 
             // Find the orientation matrix to the global XY plane
-            TransformMatrix orientation = region.OrientationToGlobalXY(plane, tolerance);
+            TransformMatrix orientation = region.OrientationToGlobalXY(slabPlane, tolerance);
             if (orientation == null)
                 return false;
 
@@ -79,10 +103,11 @@ namespace BH.Engine.Clipper
             double scale = 1 / tolerance;
             Path64 regionPath = regionOnXY.ToClipPath(scale);
 
-            // Transform and test each point
+            // Project onto slabPlane then transform (same basis as region), like Geometry.Query.IsContaining.
             foreach (Point pnt in points)
             {
-                Point64 checkPoint = pnt.Transform(orientation).ToPoint64(scale);
+                Point onPlane = pnt.Project(slabPlane);
+                Point64 checkPoint = onPlane.Transform(orientation).ToPoint64(scale);
                 PointInPolygonResult checkResult = Clipper2Lib.Clipper.PointInPolygon(checkPoint, regionPath);
 
                 if (checkResult == PointInPolygonResult.IsOutside)
@@ -173,18 +198,25 @@ namespace BH.Engine.Clipper
             if (!region.IsClosed(tolerance) || !refRegion.IsClosed(tolerance))
                 return false;
 
-            if (plane == null)
+            if (plane == null || IsGlobalXYPlane(plane))
             {
-                plane = region.FitPlane();
-                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                Plane layoutPlane = plane ?? Plane.XY;
+                Plane fitted = region.FitPlane(tolerance);
+                if (plane == null && (fitted == null || region.ControlPoints.Any(x => !x.IsInPlane(fitted, tolerance))))
                 {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
-                    return false;
+                    return refRegion.ControlPoints.All(p => region.IsContainingOnGlobalXY(p, true, tolerance));
                 }
+
+                plane = layoutPlane;
             }
 
             if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+            {
+                if (IsGlobalXYPlane(plane))
+                    return refRegion.ControlPoints.All(p => region.IsContainingOnGlobalXY(p, true, tolerance));
+
                 return false;
+            }
 
             //If refRegion sits fully inside the outer region, the boolean difference result should be empty
             return refRegion.BooleanDifference(new List<Polyline> { region }, plane, tolerance)?.Count == 0;
@@ -210,14 +242,16 @@ namespace BH.Engine.Clipper
             {
                 plane = region.FitPlane();
                 if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
-                {
-                    Base.Compute.RecordError("Clipper IsContaining method only works for planar polylines.");
-                    return false;
-                }
+                    plane = Plane.XY;
             }
+
+            bool useLayoutXY = IsGlobalXYPlane(plane);
 
             foreach (Polyline refRegion in refRegions)
             {
+                if (useLayoutXY)
+                    continue;
+
                 if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
                     return false;
             }
@@ -227,6 +261,50 @@ namespace BH.Engine.Clipper
                 if (!region.IsContaining(refRegion, plane, tolerance))
                     return false;
             }
+
+            return true;
+        }
+
+        /***************************************************/
+
+        [Description("Point-in-polygon on global XY using coordinates X and Y only. Use when geometry is already in layout XY after a view-to-global transform (matches develop PrincipalPlane.XY PolygonContains).")]
+        [Input("region", "Closed polyline in layout XY.")]
+        [Input("point", "Point in layout XY.")]
+        [Input("acceptOnEdge", "If false, points on the boundary are treated as outside.")]
+        [Input("tolerance", "Scale factor for Clipper integer coordinates.")]
+        [Output("isContaining", "True if the point is inside the region.")]
+        private static bool IsGlobalXYPlane(Plane plane)
+        {
+            if (plane == null)
+                return false;
+
+            return plane.Normal.IsParallel(Vector.ZAxis) != 0;
+        }
+
+        /***************************************************/
+
+        public static bool IsContainingOnGlobalXY(this Polyline region, Point point, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
+        {
+            if (region == null || point == null || region.ControlPoints.Count < 3)
+                return false;
+
+            if (!region.IsClosed(tolerance))
+                return false;
+
+            double scale = 1.0 / tolerance;
+            List<Point> controlPoints = new List<Point>(region.ControlPoints);
+            if (region.IsClosed(tolerance))
+                controlPoints.RemoveAt(0);
+
+            Path64 regionPath = new Path64(controlPoints.Select(p => new Point64((long)Math.Round(p.X * scale), (long)Math.Round(p.Y * scale))));
+            Point64 checkPoint = new Point64((long)Math.Round(point.X * scale), (long)Math.Round(point.Y * scale));
+            PointInPolygonResult result = Clipper2Lib.Clipper.PointInPolygon(checkPoint, regionPath);
+
+            if (result == PointInPolygonResult.IsOutside)
+                return false;
+
+            if (!acceptOnEdge && result == PointInPolygonResult.IsOn)
+                return false;
 
             return true;
         }
