@@ -34,34 +34,37 @@ namespace BH.Engine.Geometry.Clipper
         /****               Public Methods              ****/
         /***************************************************/
 
-        [Description("Finds a transform matrix that orients a planar polyline to the global XY plane.")]
-        [Input("planarCurve", "A BHoM Polyline representing the planar curve to orient.")]
-        [Input("plane", "A BHoM Plane representing the plane in which the polyline lies.")]
+        [Description("Finds a transform matrix that orients a plane to the global XY plane. The in-plane X axis follows the first non-degenerate segment of the polyline projected onto the plane, so geometry lying off the plane is mapped as if it was projected onto the plane along its normal.")]
+        [Input("planarCurve", "A BHoM Polyline used to pick the in-plane X axis of the orientation.")]
+        [Input("plane", "A BHoM Plane to orient to the global XY plane.")]
         [Input("tolerance", "Tolerance to be used for computations.")]
-        [Output("orientationMatrix", "A BHoM TransformMatrix that orients the polyline to the global XY plane.")]
+        [Output("orientationMatrix", "A BHoM TransformMatrix that orients the plane to the global XY plane.")]
         public static TransformMatrix OrientationToGlobalXY(this Polyline planarCurve, Plane plane, double tolerance)
         {
             double sqTol = tolerance * tolerance;
+            Vector normal = plane.Normal.Normalise();
 
             Vector x = null;
             Point first = planarCurve.ControlPoints[0];
             foreach (Point second in planarCurve.ControlPoints.Skip(1))
             {
-                if (first.SquareDistance(second) > sqTol)
+                Vector segment = second - first;
+                Vector inPlane = segment - normal * segment.DotProduct(normal);
+                if (inPlane.SquareLength() > sqTol)
                 {
-                    x = (second - first).Normalise();
+                    x = inPlane.Normalise();
                     break;
                 }
             }
 
             if (x == null)
             {
-                Base.Compute.RecordError("Polyline is degenerate (all points are coincident).");
+                Base.Compute.RecordError("Polyline is degenerate (all points project onto a single point of the plane).");
                 return null;
             }
 
-            Vector y = plane.Normal.CrossProduct(x);
-            Cartesian cs = new Cartesian(plane.Origin, x, y, plane.Normal);
+            Vector y = normal.CrossProduct(x);
+            Cartesian cs = new Cartesian(plane.Origin, x, y, normal);
             return cs.OrientationMatrix(new Cartesian());
         }
 

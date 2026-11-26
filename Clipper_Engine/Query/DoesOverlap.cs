@@ -20,6 +20,7 @@
  * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
  */
 
+using BH.Engine.Geometry;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
 using System.Collections.Generic;
@@ -32,15 +33,16 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Checks if two polylines intersect on a plane without one fully containing the other.")]
-        [Input("poly1", "First polyline.")]
-        [Input("poly2", "Second polyline.")]
-        [Input("plane", "If null, processing is in 2D (the plane is fitted from the first polyline). If not null, 3D geometry is processed using this plane.")]
+        [Description("Checks if the areas enclosed by two closed polylines overlap, including the case of one polyline containing the other. Polylines touching only along their boundaries do not overlap.")]
+        [Input("poly1", "First closed polyline.")]
+        [Input("poly2", "Second closed polyline.")]
+        [Input("plane", "If null, the plane is fitted from the first polyline and both polylines must lie on it. If not null, all geometry is projected onto this plane along its normal before the check.")]
         [Input("tolerance", "Distance tolerance.")]
-        [Output("intersects", "True if the polylines intersect.")]
+        [Output("overlaps", "True if the areas enclosed by the polylines overlap.")]
         public static bool DoesOverlap(this Polyline poly1, Polyline poly2, Plane plane = null, double tolerance = Tolerance.Distance)
         {
-            if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3)
+            //Open polylines don't enclose any area, so they can't overlap.
+            if (poly1 == null || poly2 == null || poly1.ControlPoints.Count < 3 || poly2.ControlPoints.Count < 3 || !poly1.IsClosed(tolerance) || !poly2.IsClosed(tolerance))
                 return false;
 
             List<Polyline> intersection = Compute.BooleanIntersection(poly1, poly2, plane, tolerance);

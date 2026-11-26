@@ -1,12 +1,29 @@
 /*
  * This file is part of the Buildings and Habitats object Model (BHoM)
  * Copyright (c) 2015 - 2026, the respective contributors. All rights reserved.
+ *
+ * Each contributor holds copyright over their respective contributions.
+ * The project versioning (Git) records all such contribution source information.
+ *
+ *
+ * The BHoM is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3.0 of the License, or
+ * (at your option) any later version.
+ *
+ * The BHoM is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
  */
 
 using BH.Engine.Geometry;
+using BH.Engine.Geometry.Clipper;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -19,11 +36,11 @@ namespace BH.Engine.Clipper
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("True if a line crosses a closed polyline region or lies fully inside it.")]
+        [Description("Checks if a line crosses the boundary of a closed polyline region or lies inside it.")]
         [Input("region", "Closed polyline region.")]
         [Input("line", "Line to test.")]
-        [Input("plane", "If null, the plane is fitted from the region when required by Clipper.")]
-        [Input("acceptOnEdge", "If false, points and segments on the boundary are not treated as inside.")]
+        [Input("plane", "If null, the plane is fitted from the region and a line that does not lie on it is ignored. If not null, all geometry is projected onto this plane along its normal before the check.")]
+        [Input("acceptOnEdge", "If false, contact with the boundary is ignored and only a line passing through the interior of the region counts.")]
         [Input("tolerance", "Distance tolerance.")]
         [Output("intersectsOrContains", "True if the line intersects or is contained in the region.")]
         public static bool IntersectsOrContains(this Polyline region, Line line, Plane plane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
@@ -31,90 +48,73 @@ namespace BH.Engine.Clipper
             if (region == null || line == null)
                 return false;
 
-            tolerance = Math.Abs(tolerance);
-
-            if (region.ControlPoints == null || region.ControlPoints.Count < 3 || !region.IsClosed(tolerance))
-                return false;
-
-            if (acceptOnEdge)
-            {
-                if (Compute.IsContaining(region, line.Start, plane, true, tolerance)
-                    || Compute.IsContaining(region, line.End, plane, true, tolerance))
-                    return true;
-
-                foreach (Line edge in region.SubParts())
-                {
-                    if (edge.LineIntersections(line, false, tolerance)?.Count > 0)
-                        return true;
-                }
-
-                return false;
-            }
-
-            //Boundary contact doesn't count: only true if some part of the line passes through the interior of the region.
-            //Split the line where it meets the boundary and test one point between each pair of split parameters.
-            List<double> parameters = new List<double> { 0, 1 };
-            foreach (Line edge in region.SubParts())
-            {
-                List<Point> crossPoints = edge.LineIntersections(line, false, tolerance);
-                if (crossPoints == null)
-                    continue;
-
-                foreach (Point crossPoint in crossPoints)
-                {
-                    double t = line.ParameterAtPoint(crossPoint, tolerance);
-                    if (t > 0 && t < 1)
-                        parameters.Add(t);
-                }
-            }
-
-            parameters.Sort();
-            double length = line.Length();
-            for (int i = 0; i < parameters.Count - 1; i++)
-            {
-                if ((parameters[i + 1] - parameters[i]) * length <= tolerance)
-                    continue;
-
-                Point mid = line.PointAtParameter((parameters[i] + parameters[i + 1]) * 0.5);
-                if (Compute.IsContaining(region, mid, plane, false, tolerance))
-                    return true;
-            }
-
-            return false;
+            return region.IntersectsOrContains(new List<Line> { line }, plane, acceptOnEdge, tolerance);
         }
 
         /***************************************************/
 
-        [Description("True if a polyline crosses a closed region, lies inside it, or fully contains the region.")]
+        [Description("Checks if a polyline crosses the boundary of a closed polyline region or lies inside it. A region lying inside the polyline does not count.")]
         [Input("region", "Closed polyline region.")]
-        [Input("polyline", "Line or polyline boundary to test (open or closed).")]
-        [Input("plane", "If null, the plane is fitted from the region when required by Clipper.")]
-        [Input("acceptOnEdge", "If false, boundary contact is ignored and only a line passing through the interior of the region counts.")]
+        [Input("polyline", "Open or closed polyline to test.")]
+        [Input("plane", "If null, the plane is fitted from the region and a polyline that does not lie on it is ignored. If not null, all geometry is projected onto this plane along its normal before the check.")]
+        [Input("acceptOnEdge", "If false, contact with the boundary is ignored and only a polyline passing through the interior of the region counts.")]
         [Input("tolerance", "Distance tolerance.")]
-        [Output("intersectsOrContains", "True if the curves intersect or one contains the other.")]
+        [Output("intersectsOrContains", "True if the polyline intersects or is contained in the region.")]
         public static bool IntersectsOrContains(this Polyline region, Polyline polyline, Plane plane = null, bool acceptOnEdge = true, double tolerance = Tolerance.Distance)
         {
-            if (region == null || polyline == null)
+            if (region == null || polyline?.ControlPoints == null || polyline.ControlPoints.Count < 2)
                 return false;
 
-            tolerance = Math.Abs(tolerance);
+            return region.IntersectsOrContains(polyline.SubParts(), plane, acceptOnEdge, tolerance);
+        }
 
-            if (polyline.ControlPoints == null || polyline.ControlPoints.Count < 2)
+        /***************************************************/
+        /****              Private methods              ****/
+        /***************************************************/
+
+        private static bool IntersectsOrContains(this Polyline region, List<Line> lines, Plane plane, bool acceptOnEdge, double tolerance)
+        {
+            if (region.ControlPoints == null || region.ControlPoints.Count < 3 || !region.IsClosed(tolerance))
                 return false;
 
-            if (polyline.ControlPoints.Count >= 3 && polyline.IsClosed(tolerance)
-                && Compute.IsContaining(region, polyline, plane, tolerance))
-                return true;
-
-            if (region.ControlPoints.Count >= 3 && region.IsClosed(tolerance)
-                && polyline.ControlPoints.Count >= 3 && polyline.IsClosed(tolerance)
-                && Compute.IsContaining(polyline, region, plane, tolerance))
-                return true;
-
-            foreach (Line segment in polyline.SubParts())
+            if (plane == null)
             {
-                if (region.IntersectsOrContains(segment, plane, acceptOnEdge, tolerance))
-                    return true;
+                plane = region.FitPlane(tolerance);
+                if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
+                {
+                    Base.Compute.RecordError("No plane was supplied and the region is not planar, so the Clipper method can't be computed.");
+                    return false;
+                }
+
+                if (lines.Any(x => !x.Start.IsInPlane(plane, tolerance) || !x.End.IsInPlane(plane, tolerance)))
+                    return false;
+            }
+
+            TransformMatrix orientation = region.OrientationToGlobalXY(plane, tolerance);
+            if (orientation == null)
+                return false;
+
+            Polyline regionOnXY = region.FlattenedOnXY(orientation);
+            List<Line> edgesOnXY = regionOnXY.SubParts();
+            foreach (Line line in lines)
+            {
+                Line lineOnXY = line.FlattenedOnXY(orientation);
+                if (acceptOnEdge)
+                {
+                    //Any contact with the boundary counts. Without it, the line is either fully inside or fully outside the region.
+                    if (edgesOnXY.Any(x => x.LineIntersections(lineOnXY, false, tolerance).Count != 0))
+                        return true;
+
+                    if (regionOnXY.IsContainingOnXY(new List<Point> { lineOnXY.Start }, true, tolerance))
+                        return true;
+                }
+                else
+                {
+                    //Only a piece of the line passing through the interior of the region counts.
+                    List<double> parameters = regionOnXY.SplitParameters(lineOnXY, tolerance);
+                    if (lineOnXY.PieceMidPoints(parameters, tolerance).Any(x => regionOnXY.IsContainingOnXY(new List<Point> { x }, false, tolerance)))
+                        return true;
+                }
             }
 
             return false;

@@ -4,141 +4,84 @@
  *
  * Each contributor holds copyright over their respective contributions.
  * The project versioning (Git) records all such contribution source information.
- *                                           
- *                                                                              
- * The BHoM is free software: you can redistribute it and/or modify         
- * it under the terms of the GNU Lesser General Public License as published by  
- * the Free Software Foundation, either version 3.0 of the License, or          
- * (at your option) any later version.                                          
- *                                                                              
- * The BHoM is distributed in the hope that it will be useful,              
- * but WITHOUT ANY WARRANTY; without even the implied warranty of               
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the                 
- * GNU Lesser General Public License for more details.                          
- *                                                                            
- * You should have received a copy of the GNU Lesser General Public License     
- * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.      
+ *
+ *
+ * The BHoM is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3.0 of the License, or
+ * (at your option) any later version.
+ *
+ * The BHoM is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this code. If not, see <https://www.gnu.org/licenses/lgpl-3.0.html>.
  */
 
 using BH.Engine.Geometry;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 
 namespace BH.Engine.Clipper
 {
-    public static partial class Compute
+    public static partial class Query
     {
         /***************************************************/
         /****              Public methods               ****/
         /***************************************************/
 
-        [Description("Checks if a point is inside the boundary of a planar surface but not inside one of its holes.")]
-        [Input("point", "A point that is potentially inside the boundary of a planar surface.")]
-        [Input("surface", "A planar surface that can have internal boundaries/holes.")]
-        [Input("tolerance", "Distance tolerance for the containment check.")]
+        [Description("Checks if a point is inside the outer boundary of a planar surface but not inside one of its holes. A point on the outer boundary or on the boundary of a hole counts as being on the face.")]
+        [Input("point", "A point that is potentially on the planar surface.")]
+        [Input("surface", "A planar surface with polyline boundaries that can have internal boundaries/holes.")]
+        [Input("plane", "If null, the point needs to lie in the plane of the surface and within its boundaries. If not null, all geometry is projected onto this plane along its normal before the check.")]
+        [Input("tolerance", "Distance tolerance for the planarity and containment checks.")]
         [Output("isOnFace", "True if the point is inside the outer boundary and not inside a hole.")]
-        public static bool IsOnFace(this Point point, PlanarSurface surface, double tolerance = Tolerance.Distance)
+        public static bool IsOnFace(this Point point, PlanarSurface surface, Plane plane = null, double tolerance = Tolerance.Distance)
         {
-            if (point == null || surface?.ExternalBoundary == null)
+            if (point == null || surface == null)
                 return false;
 
-            (Polyline outer, List<Polyline> inner) = PolylineBoundaries(surface);
-            if (outer == null)
+            Polyline outer = surface.ExternalBoundary as Polyline;
+            List<Polyline> inner = surface.InternalBoundaries?.Select(x => x as Polyline).ToList() ?? new List<Polyline>();
+            if (outer == null || inner.Any(x => x == null))
             {
-                BH.Engine.Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
+                Base.Compute.RecordError("Clipper IsOnFace method only works for planar surfaces with polyline boundaries.");
                 return false;
             }
 
-            Plane plane = surface.FitPlane(Math.Abs(tolerance));
-            if (plane == null)
-                return false;
-
-            //The point is treated as coplanar with the surface: only its position within the plane matters.
             return point.IsOnFace(outer, inner, plane, tolerance);
-
         }
 
         /***************************************************/
 
-        //[Description("Checks if a point is inside the boundary of a planar surface but not inside one of its holes.")]
-        //[Input("point", "A point that is potentially inside the boundary of a planar surface.")]
-        //[Input("surface", "A planar surface that can have internal boundaries/holes.")]
-        //[Input("tolerance", "Distance tolerance for the containment check.")]
-        //[Output("isOnFace", "True if the point is inside the outer boundary and not inside a hole.")]
+        [Description("Checks if a point is inside an outer region but not inside one of the inner regions (holes). A point on the outer boundary or on the boundary of a hole counts as being on the face.")]
+        [Input("point", "A point that is potentially on the face.")]
+        [Input("outer", "Closed polyline defining the outer boundary of the face.")]
+        [Input("inner", "Closed polylines defining the holes of the face.")]
+        [Input("plane", "If null, the point needs to lie in the plane of the outer region and within its boundaries. If not null, all geometry is projected onto this plane along its normal before the check.")]
+        [Input("tolerance", "Distance tolerance for the planarity and containment checks.")]
+        [Output("isOnFace", "True if the point is inside the outer region and not inside a hole.")]
         public static bool IsOnFace(this Point point, Polyline outer, List<Polyline> inner, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (point == null || outer == null)
                 return false;
 
-            //A negative tolerance means the point must sit at least that far away from any boundary (inside the outer one and outside the openings).
-            double margin = tolerance < 0 ? -tolerance : 0;
-            tolerance = Math.Abs(tolerance);
-
-            if (!outer.IsClosed(tolerance))
-                return false;
-
-            if (inner != null && inner.Any(x => x != null && !x.IsClosed(tolerance)))
-                return false;
-
             if (plane == null)
             {
-                plane = outer.FitPlane(tolerance);
-                if (plane == null || outer.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)) || (inner != null && inner.Any(y => y != null && y.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))))
-                {
-                    Base.Compute.RecordError("Clipper IsOnFace method only works for planar polylines.");
+                plane = outer.FittedPlane(tolerance);
+                if (plane == null || !point.IsInPlane(plane, tolerance))
                     return false;
-                }
-
             }
 
-            point = point.Project(plane);
-
-            if (!outer.IsContaining(point, plane, margin == 0, tolerance))
+            if (!outer.IsContaining(point, plane, true, tolerance))
                 return false;
 
-            if (inner != null && inner.Any(x => x != null && x.IsContaining(point, plane, false, tolerance)))
-                return false;
-
-            if (margin > 0)
-            {
-                if (point.Distance(outer) < margin)
-                    return false;
-
-                if (inner != null && inner.Any(x => x != null && point.Distance(x) < margin))
-                    return false;
-            }
-
-            return true;
-        }
-
-        /***************************************************/
-        /****              Private methods              ****/
-        /***************************************************/
-
-        private static (Polyline outer, List<Polyline> inner) PolylineBoundaries(PlanarSurface surface)
-        {
-            Polyline outer = surface.ExternalBoundary as Polyline;
-            if (outer == null)
-                return (null, null);
-
-            List<Polyline> inner = new List<Polyline>();
-            if (surface.InternalBoundaries == null)
-                return (outer, inner);
-
-            foreach (ICurve boundary in surface.InternalBoundaries)
-            {
-                Polyline innerPolyline = boundary as Polyline;
-                if (innerPolyline == null)
-                    return (null, null);
-
-                inner.Add(innerPolyline);
-            }
-
-            return (outer, inner);
+            return inner == null || inner.All(x => x == null || !x.IsContaining(point, plane, false, tolerance));
         }
 
         /***************************************************/
