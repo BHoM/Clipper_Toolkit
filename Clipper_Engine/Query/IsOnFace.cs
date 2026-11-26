@@ -23,6 +23,7 @@
 using BH.Engine.Geometry;
 using BH.oM.Base.Attributes;
 using BH.oM.Geometry;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -52,13 +53,11 @@ namespace BH.Engine.Clipper
                 return false;
             }
 
-            Plane plane = surface.FitPlane(tolerance);
+            Plane plane = surface.FitPlane(Math.Abs(tolerance));
             if (plane == null)
                 return false;
 
-            if (!point.IsInPlane(plane, tolerance))
-                return false;
-
+            //The point is treated as coplanar with the surface: only its position within the plane matters.
             return point.IsOnFace(outer, inner, plane, tolerance);
 
         }
@@ -75,6 +74,10 @@ namespace BH.Engine.Clipper
             if (point == null || outer == null)
                 return false;
 
+            //A negative tolerance means the point must sit at least that far away from any boundary (inside the outer one and outside the openings).
+            double margin = tolerance < 0 ? -tolerance : 0;
+            tolerance = Math.Abs(tolerance);
+
             if (!outer.IsClosed(tolerance))
                 return false;
 
@@ -90,11 +93,26 @@ namespace BH.Engine.Clipper
                     return false;
                 }
 
-                if (!point.IsInPlane(plane, tolerance))
+            }
+
+            point = point.Project(plane);
+
+            if (!outer.IsContaining(point, plane, margin == 0, tolerance))
+                return false;
+
+            if (inner != null && inner.Any(x => x != null && x.IsContaining(point, plane, false, tolerance)))
+                return false;
+
+            if (margin > 0)
+            {
+                if (point.Distance(outer) < margin)
+                    return false;
+
+                if (inner != null && inner.Any(x => x != null && point.Distance(x) < margin))
                     return false;
             }
 
-            return outer.IsContaining(point, plane, true, tolerance) && !inner.Any(x => x != null && x.IsContaining(point, plane, false, tolerance));
+            return true;
         }
 
         /***************************************************/

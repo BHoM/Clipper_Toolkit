@@ -73,13 +73,8 @@ namespace BH.Engine.Clipper
                 slabPlane = region.FitPlane();
                 if (slabPlane == null || region.ControlPoints.Any(x => !x.IsInPlane(slabPlane, tolerance)))
                 {
-                    foreach (Point pnt in points)
-                    {
-                        if (!region.IsContainingOnGlobalXY(pnt, acceptOnEdge, tolerance))
-                            return false;
-                    }
-
-                    return true;
+                    Base.Compute.RecordError("No plane was supplied and the region is not planar, so containment can't be computed.");
+                    return false;
                 }
             }
             else
@@ -189,8 +184,9 @@ namespace BH.Engine.Clipper
         [Input("refRegion", "The reference polyline to check if it is fully contained within the region.")]
         [Input("plane", "If null, processing is in 2D (the plane is fitted from the region polyline). If not null, 3D geometry is processed using this plane.")]
         [Input("tolerance", "Optional. The geometric tolerance for coplanarity and containment checks. Default is Tolerance.Distance.")]
+        [Input("acceptOnEdge", "If false, the reference polyline must lie strictly inside the region: any of its vertices on the region's boundary makes the result false.")]
         [Output("True if the reference polyline is fully contained within the region polyline; otherwise, false.")]
-        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane plane = null, double tolerance = Tolerance.Distance)
+        public static bool IsContaining(this Polyline region, Polyline refRegion, Plane plane = null, double tolerance = Tolerance.Distance, bool acceptOnEdge = true)
         {
             if (region == null || refRegion == null || region.ControlPoints.Count < 3 || refRegion.ControlPoints.Count < 3)
                 return false;
@@ -198,25 +194,30 @@ namespace BH.Engine.Clipper
             if (!region.IsClosed(tolerance) || !refRegion.IsClosed(tolerance))
                 return false;
 
-            if (plane == null || IsGlobalXYPlane(plane))
+            if (plane == null)
             {
-                Plane layoutPlane = plane ?? Plane.XY;
+                //No plane supplied: use the plane of the region itself, never an assumed global plane.
                 Plane fitted = region.FitPlane(tolerance);
-                if (plane == null && (fitted == null || region.ControlPoints.Any(x => !x.IsInPlane(fitted, tolerance))))
+                if (fitted == null || region.ControlPoints.Any(x => !x.IsInPlane(fitted, tolerance)))
                 {
-                    return refRegion.ControlPoints.All(p => region.IsContainingOnGlobalXY(p, true, tolerance));
+                    Base.Compute.RecordError("No plane was supplied and the region is not planar, so containment can't be computed.");
+                    return false;
                 }
 
-                plane = layoutPlane;
+                plane = fitted;
             }
 
+            //The reference polyline is treated as coplanar with the region: only its position within the plane matters.
             if (refRegion.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
             {
                 if (IsGlobalXYPlane(plane))
-                    return refRegion.ControlPoints.All(p => region.IsContainingOnGlobalXY(p, true, tolerance));
+                    return refRegion.ControlPoints.All(p => region.IsContainingOnGlobalXY(p, acceptOnEdge, tolerance));
 
-                return false;
+                refRegion = new Polyline { ControlPoints = refRegion.ControlPoints.Select(x => x.Project(plane)).ToList() };
             }
+
+            if (!acceptOnEdge && !IsContaining(region, refRegion.ControlPoints, plane, false, tolerance))
+                return false;
 
             //If refRegion sits fully inside the outer region, the boolean difference result should be empty
             return refRegion.BooleanDifference(new List<Polyline> { region }, plane, tolerance)?.Count == 0;
@@ -242,7 +243,10 @@ namespace BH.Engine.Clipper
             {
                 plane = region.FitPlane();
                 if (plane == null || region.ControlPoints.Any(x => !x.IsInPlane(plane, tolerance)))
-                    plane = Plane.XY;
+                {
+                    Base.Compute.RecordError("No plane was supplied and the region is not planar, so containment can't be computed.");
+                    return false;
+                }
             }
 
             bool useLayoutXY = IsGlobalXYPlane(plane);

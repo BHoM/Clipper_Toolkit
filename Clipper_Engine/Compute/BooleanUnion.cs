@@ -47,19 +47,17 @@ namespace BH.Engine.Clipper
             if (polylines == null || polylines.Count == 0)
                 return new List<Polyline>();
 
-            // Filter out null or invalid polylines
-            List<Polyline> validPolylines = polylines.Where(x => x != null && x.ControlPoints.Count >= 3).ToList();
+            // Filter out null, degenerate or open polylines: the union is computed from all valid closed loops.
+            List<Polyline> nonNull = polylines.Where(x => x != null && x.ControlPoints.Count >= 3).ToList();
+            List<Polyline> validPolylines = nonNull.Where(x => x.IsClosed(tolerance)).ToList();
+            if (validPolylines.Count < nonNull.Count)
+                Base.Compute.RecordWarning("Boolean Union works on closed regions: open polylines were ignored.");
+
             if (validPolylines.Count == 0)
                 return new List<Polyline>();
 
             if (validPolylines.Count == 1)
                 return new List<Polyline> { validPolylines[0] };
-
-            if (validPolylines.Any(x => !x.IsClosed(tolerance)))
-            {
-                Base.Compute.RecordError("Boolean Union works on closed regions.");
-                return new List<Polyline>();
-            }
 
             if (plane == null)
             {

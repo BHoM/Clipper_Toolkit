@@ -38,8 +38,9 @@ namespace BH.Engine.Clipper
         [Description("Removes duplicate polylines. Two polylines are duplicates when their control points are equal in the same order. Either list may be shifted, so a different starting point still counts as a duplicate. If plane is null, control points are compared directly. If plane is not null, they are projected onto the plane before comparison.")]
         [Input("polylines", "The collection of polylines to cull duplicates from.")]
         [Input("plane", "If null, control points are compared directly. If not null, control points are projected onto this plane before comparison.")]
+        [Input("tolerance", "Distance tolerance used to decide whether two polylines are the same.")]
         [Output("polylines", "The collection of polylines with duplicates removed.")]
-        public static List<Polyline> CullDuplicates(this IEnumerable<Polyline> polylines, Plane plane = null)
+        public static List<Polyline> CullDuplicates(this IEnumerable<Polyline> polylines, Plane plane = null, double tolerance = Tolerance.Distance)
         {
             if (polylines == null)
                 return new List<Polyline>();
@@ -50,7 +51,7 @@ namespace BH.Engine.Clipper
                 if (polyline == null)
                     continue;
 
-                if (!culled.Any(x => x.IsSame(polyline, plane)))
+                if (!culled.Any(x => x.IsSame(polyline, plane, tolerance)))
                     culled.Add(polyline);
             }
 
